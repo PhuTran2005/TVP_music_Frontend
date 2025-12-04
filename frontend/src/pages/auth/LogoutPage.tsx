@@ -1,0 +1,45 @@
+import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAppDispatch } from "@/store/store";
+
+import { toast } from "sonner"; // Hoặc notification của bạn
+import authApi from "@/features/auth/api/authApi";
+import { logout } from "@/features";
+import { VinylLoader } from "@/components/ui/MusicLoadingEffects";
+
+const LogoutPage = () => {
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const hasCalled = useRef(false); // Chống React.StrictMode gọi 2 lần
+
+  useEffect(() => {
+    if (hasCalled.current) return;
+    hasCalled.current = true;
+
+    const handleLogout = async () => {
+      try {
+        // 1. Gọi API để Backend xóa Cookie HttpOnly
+        // (Chúng ta không quan tâm kết quả trả về, cứ gọi là được)
+        await authApi.logout();
+      } catch (error) {
+        console.error("Logout API error:", error);
+        // Không cần báo lỗi cho user, vì mục đích cuối cùng vẫn là logout
+      } finally {
+        // 2. Xóa State trong Redux (Quan trọng nhất)
+        dispatch(logout());
+
+        // 3. Thông báo nhẹ
+        toast.success("Đã đăng xuất thành công");
+
+        // 4. Chuyển hướng về trang Login (replace: true để không back lại được trang này)
+        navigate("/login", { replace: true });
+      }
+    };
+
+    handleLogout();
+  }, [dispatch, navigate]);
+
+  return <VinylLoader fullscreen text="Đang đăng xuất..." />;
+};
+
+export default LogoutPage;

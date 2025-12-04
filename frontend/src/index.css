@@ -117,4 +117,12 @@
   body {
     @apply bg-background text-foreground;
   }
+  button {
+    @apply cursor-pointer;
+  }
+
+  /* Tùy chọn: Nếu nút bị disable thì không hiện bàn tay */
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
 }
