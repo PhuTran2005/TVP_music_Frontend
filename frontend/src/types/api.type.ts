@@ -20,8 +20,10 @@ export interface ApiErrorResponse {
 
 export interface PagedResponse<T> {
   data: T[];
-  totalItems: number;
-  page?: number;
-  pageSize?: number;
-  totalPages?: number;
+  meta: {
+    totalItems: number;
+    page: number;
+    pageSize?: number;
+    totalPages: number;
+  };
 }

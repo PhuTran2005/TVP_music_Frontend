@@ -1,3 +1,5 @@
+import type { User } from "@/features/user";
+
 // ✅ Dữ liệu trả về từ backend
 export interface AuthDto<TUser> {
   accessToken: string;
@@ -6,38 +8,9 @@ export interface AuthDto<TUser> {
 }
 
 // ✅ Mô tả user trong hệ thống
-export interface UserProfile {
-  // 1. MongoDB luôn trả về '_id'.
-  // (Nếu controller bạn map sang 'id' thì dùng 'id', nhưng chuẩn Mongo là _id)
-  _id: string;
-
-  // 2. Chúng ta đã chốt dùng 'fullName' để hiển thị tên
-  fullName: string;
-
-  // 3. Username là slug (tran-van-phu), tùy chọn hiển thị
-  username?: string;
-
-  email: string;
-
-  // 4. Role nên dùng Union Type để code TS gợi ý cho sướng
-  role: "user" | "artist" | "admin";
-
-  // 5. Ảnh đại diện (quan trọng cho Header)
-  avatar?: string;
-
-  // 6. Trạng thái xác thực
-  isVerified: boolean;
-
-  // 7. Nguồn gốc (Google hay Local)
-  authProvider?: "local" | "google";
-
-  // 8. Mongo trả về 'createdAt', không phải 'joinDate'
-  createdAt: string;
-  updatedAt: string;
-}
 
 // ✅ Redux slice state
-export interface AuthState<TUser = UserProfile> {
+export interface AuthState<TUser = User> {
   token: string | null;
   user: TUser | null;
   isAuthChecking: boolean;
@@ -60,7 +33,20 @@ export interface ForgetPasswordRequest {
 export interface ForgetPasswordResponse {
   email: string;
 }
+// Các type cũ giữ nguyên (LoginRequest, RegisterRequest...)
 
-export type LoginResponse = AuthDto<UserProfile>;
-export type RegisterResponse = AuthDto<UserProfile>;
-export type RefreshResponse = AuthDto<UserProfile>;
+// Type cho Đổi mật khẩu
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+// Type cho Claim Profile (Nhận tài khoản ảo)
+export interface ClaimProfileRequest {
+  newEmail: string;
+  newPassword: string;
+}
+export type LoginResponse = AuthDto<User>;
+export type RegisterResponse = AuthDto<User>;
+export type RefreshResponse = AuthDto<User>;

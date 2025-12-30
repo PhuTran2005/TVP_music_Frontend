@@ -42,7 +42,15 @@ export const useLogin = () => {
           user: res.data.user,
         })
       );
+      if (res.data.user.mustChangePassword) {
+        toast.warning("Yêu cầu bảo mật", {
+          description: "Vui lòng đổi mật khẩu mới cho lần đăng nhập đầu tiên.",
+        });
 
+        // Chuyển hướng sang trang bắt buộc đổi pass
+        navigate("/force-change-password");
+        return; // Dừng lại, không navigate("/") về Home
+      }
       toast.success("Welcome back!", {
         description: `Logged in as ${
           res.data.user.fullName || res.data.user.username
@@ -55,8 +63,21 @@ export const useLogin = () => {
       const err = error as ApiErrorResponse;
       const errorCode = err.response?.data?.errorCode;
       const message = err.response?.data?.message || "Login failed";
-
-      // CASE 1: Tài khoản chưa xác thực -> Chuyển sang trang OTP
+      // 🛑 CASE 1: TÀI KHOẢN BỊ KHÓA (MỚI THÊM)
+      if (errorCode === "ACCOUNT_LOCKED") {
+        toast.error("Tài khoản đã bị khóa", {
+          description:
+            message || "Vui lòng liên hệ quản trị viên để biết thêm chi tiết.",
+          duration: 5000, // Hiện lâu chút để đọc
+          action: {
+            label: "Liên hệ",
+            onClick: () =>
+              (window.location.href = "mailto:support@musichub.com"),
+          },
+        });
+        return; // Dừng lại, không làm gì thêm
+      }
+      // CASE 2: Tài khoản chưa xác thực -> Chuyển sang trang OTP
       if (errorCode === "UNVERIFIED_ACCOUNT") {
         const email = err.response?.data?.data?.email; // Lấy email từ response chuẩn
 

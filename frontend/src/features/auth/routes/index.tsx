@@ -9,6 +9,7 @@ import {
   VerifyOtpPage,
 } from "@/pages";
 import { AUTH_PATHS } from "@/config/paths";
+import ForceChangePasswordPage from "@/pages/auth/ForceChangePasswordPage";
 
 // 1. Nhóm dành cho khách (Guest Only) - Đã login thì cấm vào
 export const guestAuthRoutes: RouteObject[] = [
@@ -43,5 +44,9 @@ export const protectedAuthRoutes: RouteObject[] = [
   {
     path: AUTH_PATHS.LOGOUT,
     element: <LogoutPage />,
+  },
+  {
+    path: AUTH_PATHS.FORCE_CHANGE_PASSWORD,
+    element: <ForceChangePasswordPage />,
   },
 ];

@@ -1,441 +1,379 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search,
-  Clock,
   Play,
   Heart,
   MoreHorizontal,
+  Clock,
   TrendingUp,
+  Search as SearchIcon,
+  Music2,
+  Disc,
+  User,
+  ListMusic,
 } from "lucide-react";
-import { Link } from "react-router-dom";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
-import { Badge } from "../../components/ui/badge";
-import { Separator } from "../../components/ui/separator";
-import { ImageWithFallback } from "../../components/figma/ImageWithFallback";
 
+// Components
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
+import { Input } from "@/components/ui/input";
+
+// Hooks & Utils
+import { useSearch } from "@/features/search/hooks/useSearch"; // Hook đã làm ở bước trước
+import { cn } from "@/lib/utils";
+import { SearchSkeleton } from "@/features/search/components/SearchSkeleton";
+
+// --- MOCK TRENDING DATA (Frontend Only) ---
 const trendingSearches = [
-  "Aurora Dreams",
-  "Midnight Echoes",
-  "Electronic",
+  "Son Tung M-TP",
   "Chill vibes",
-  "Indie rock",
-  "New releases",
-  "Hip hop",
-  "Workout music",
+  "Pop Ballad",
+  "Rap Viet",
+  "Indie",
+  "Workout",
+  "New Releases",
+  "Lo-fi",
 ];
 
-const searchResults = {
-  songs: [
-    {
-      id: 1,
-      title: "Midnight Echoes",
-      artist: "Aurora Dreams",
-      album: "Digital Dreams",
-      duration: "3:24",
-      image:
-        "https://images.unsplash.com/photo-1629923759854-156b88c433aa?w=100",
-    },
-    {
-      id: 2,
-      title: "Vinyl Dreams",
-      artist: "The Retro Collective",
-      album: "Nostalgic Vibes",
-      duration: "4:12",
-      image:
-        "https://images.unsplash.com/photo-1718217028088-a23cb3b277c4?w=100",
-    },
-    {
-      id: 3,
-      title: "Urban Beats",
-      artist: "Street Symphony",
-      album: "City Nights",
-      duration: "3:45",
-      image:
-        "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=100",
-    },
-  ],
-  artists: [
-    {
-      id: 1,
-      name: "Aurora Dreams",
-      genre: "Electronic",
-      image:
-        "https://images.unsplash.com/photo-1494790108755-2616c5e93413?w=200",
-      monthlyListeners: "2.5M",
-    },
-    {
-      id: 2,
-      name: "The Retro Collective",
-      genre: "Indie Rock",
-      image:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
-      monthlyListeners: "1.8M",
-    },
-  ],
-  albums: [
-    {
-      id: 1,
-      title: "Digital Dreams",
-      artist: "Aurora Dreams",
-      year: "2024",
-      image:
-        "https://images.unsplash.com/photo-1629923759854-156b88c433aa?w=200",
-    },
-    {
-      id: 2,
-      title: "Nostalgic Vibes",
-      artist: "The Retro Collective",
-      year: "2024",
-      image:
-        "https://images.unsplash.com/photo-1718217028088-a23cb3b277c4?w=200",
-    },
-  ],
-  playlists: [
-    {
-      id: 1,
-      title: "Electronic Euphoria",
-      creator: "MusicHub",
-      songs: 45,
-      image:
-        "https://images.unsplash.com/photo-1571974599782-87624638275c?w=200",
-    },
-    {
-      id: 2,
-      title: "Indie Discoveries",
-      creator: "Music Explorer",
-      songs: 78,
-      image:
-        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=200",
-    },
-  ],
-};
+export default function SearchPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-export function SearchPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [hasSearched, setHasSearched] = useState(false);
-  const [recentSearches, setRecentSearches] = useState([
-    "Aurora Dreams",
-    "Chill music",
-    "Electronic beats",
-  ]);
+  // 1. Lấy query từ URL (?q=...)
+  const query = searchParams.get("q") || "";
+  const [localInput, setLocalInput] = useState(query);
 
+  // 2. Fetch Data Realtime (Hook tự handle Debounce)
+  const { data, isLoading, isError } = useSearch(query);
+
+  // Sync input với URL khi URL thay đổi (VD: Search từ Header)
   useEffect(() => {
-    if (searchQuery.length > 0) {
-      const timer = setTimeout(() => {
-        setHasSearched(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setHasSearched(false);
-    }
-  }, [searchQuery]);
+    setLocalInput(query);
+  }, [query]);
 
-  const handleTrendingSearch = (term: string) => {
-    setSearchQuery(term);
-    if (!recentSearches.includes(term)) {
-      setRecentSearches([term, ...recentSearches.slice(0, 4)]);
+  // Handle Input Change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setLocalInput(val);
+    // Update URL để trigger search (có thể debounce ở đây hoặc trong hook)
+    if (val.trim()) {
+      setSearchParams({ q: val });
+    } else {
+      setSearchParams({});
     }
   };
 
-  return (
-    <div className="container px-4 lg:px-6 py-8">
-      {/* Search Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-4xl lg:text-5xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-          Search
-        </h1>
+  const handleTrendingClick = (term: string) => {
+    setLocalInput(term);
+    setSearchParams({ q: term });
+  };
 
-        {/* Search Input */}
-        <div className="relative max-w-2xl">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-          <Input
-            placeholder="What do you want to listen to?"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-12 h-14 text-lg bg-muted/50 border-border/50 focus:bg-background"
-          />
-        </div>
-      </motion.div>
+  // --- RENDER SECTIONS ---
 
-      {!hasSearched ? (
-        <>
-          {/* Recent Searches */}
-          {recentSearches.length > 0 && (
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="mb-8"
-            >
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Recent searches
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {recentSearches.map((search, index) => (
-                  <motion.button
-                    key={index}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleTrendingSearch(search)}
-                    className="px-4 py-2 bg-muted/50 hover:bg-muted rounded-full text-sm transition-colors"
-                  >
-                    {search}
-                  </motion.button>
-                ))}
-              </div>
-            </motion.section>
-          )}
+  // 1. TOP RESULT RENDERER
+  const renderTopResult = () => {
+    if (!data?.topResult) return null;
 
-          {/* Trending Searches */}
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Trending searches
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {trendingSearches.map((search, index) => (
-                <motion.button
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ y: -2 }}
-                  onClick={() => handleTrendingSearch(search)}
-                  className="p-4 bg-gradient-to-br from-muted/50 to-muted/30 hover:from-muted to-muted/70 rounded-lg text-left transition-all duration-200 border border-border/50"
-                >
-                  <span className="font-medium">{search}</span>
-                </motion.button>
-              ))}
-            </div>
-          </motion.section>
-        </>
-      ) : (
-        /* Search Results */
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="space-y-8"
+    const { topResult } = data;
+    const isArtist = topResult.type === "artist";
+
+    return (
+      <section>
+        <h2 className="text-2xl font-bold mb-4">Top result</h2>
+        <Link
+          to={
+            isArtist
+              ? `/artists/${topResult.slug}`
+              : `/tracks/${topResult.slug}`
+          }
         >
-          {/* Top Result */}
-          <section>
-            <h2 className="text-xl font-semibold mb-4">Top result</h2>
-            <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300 max-w-md">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
+          <Card className="group cursor-pointer hover:bg-accent/50 transition-colors border-border/50 bg-card/50 max-w-md">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-6">
+                <div className="relative">
                   <ImageWithFallback
-                    src={searchResults.artists[0].image}
-                    alt={searchResults.artists[0].name}
-                    className="w-20 h-20 rounded-full object-cover"
+                    src={isArtist ? topResult.avatar : topResult.coverImage}
+                    alt={isArtist ? topResult.name : topResult.title}
+                    className={cn(
+                      "w-24 h-24 object-cover shadow-lg",
+                      isArtist ? "rounded-full" : "rounded-md"
+                    )}
                   />
-                  <div className="flex-1">
-                    <h3 className="text-2xl font-bold mb-1">
-                      {searchResults.artists[0].name}
-                    </h3>
-                    <Badge variant="secondary" className="mb-2">
-                      Artist
-                    </Badge>
-                    <p className="text-sm text-muted-foreground">
-                      {searchResults.artists[0].monthlyListeners} monthly
-                      listeners
-                    </p>
+                  {/* Play Button Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full">
+                    <Button
+                      size="icon"
+                      className="rounded-full h-12 w-12 shadow-xl bg-primary text-primary-foreground hover:scale-105 transition-transform"
+                    >
+                      <Play className="h-6 w-6 fill-current ml-1" />
+                    </Button>
                   </div>
-                  <Button
-                    size="lg"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Play className="h-5 w-5" fill="currentColor" />
-                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </section>
 
-          {/* Songs */}
-          <section>
-            <h2 className="text-xl font-semibold mb-4">Songs</h2>
-            <div className="space-y-2">
-              {searchResults.songs.map((song, index) => (
-                <motion.div
-                  key={song.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="group flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                >
-                  <div className="relative">
-                    <ImageWithFallback
-                      src={song.image}
-                      alt={song.title}
-                      className="w-12 h-12 rounded object-cover"
-                    />
-                    <Button
-                      size="sm"
-                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 text-white hover:bg-black/70"
-                    >
-                      <Play className="h-4 w-4" fill="currentColor" />
-                    </Button>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium truncate">{song.title}</h4>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {song.artist} • {song.album}
-                    </p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-2xl font-bold mb-1 truncate">
+                    {isArtist ? topResult.name : topResult.title}
+                  </h3>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="opacity-0 group-hover:opacity-100"
+                    <Badge
+                      variant="secondary"
+                      className="uppercase text-[10px] tracking-wider"
                     >
-                      <Heart className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {song.duration}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="opacity-0 group-hover:opacity-100"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                      {topResult.type}
+                    </Badge>
+                    {!isArtist && (
+                      <span className="text-sm text-muted-foreground truncate">
+                        {topResult.artist.name}
+                      </span>
+                    )}
                   </div>
-                </motion.div>
-              ))}
-            </div>
-          </section>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </section>
+    );
+  };
 
-          <Separator />
+  // 2. SONGS LIST RENDERER
+  const renderSongs = () => {
+    if (!data?.tracks?.length) return null;
 
-          {/* Artists */}
-          <section>
-            <h2 className="text-xl font-semibold mb-4">Artists</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {searchResults.artists.map((artist, index) => (
-                <motion.div
-                  key={artist.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -4 }}
+    return (
+      <section>
+        <h2 className="text-2xl font-bold mb-4">Songs</h2>
+        <div className="space-y-1">
+          {data.tracks.map((track, index) => (
+            <motion.div
+              key={track._id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="group flex items-center gap-3 p-2 rounded-md hover:bg-accent/50 transition-colors cursor-pointer group"
+            >
+              <div className="relative shrink-0">
+                <ImageWithFallback
+                  src={track.coverImage}
+                  alt={track.title}
+                  className="w-10 h-10 rounded object-cover"
+                />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                  <Play className="h-4 w-4 text-white fill-current" />
+                </div>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <Link
+                  to={`/tracks/${track.slug}`}
+                  className="font-medium truncate hover:underline block text-sm"
                 >
-                  <Link to={`/artists/${artist.id}`}>
-                    <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300">
-                      <CardContent className="p-4 text-center">
-                        <ImageWithFallback
-                          src={artist.image}
-                          alt={artist.name}
-                          className="w-24 h-24 rounded-full object-cover mx-auto mb-3"
-                        />
-                        <h4 className="font-semibold mb-1">{artist.name}</h4>
-                        <Badge variant="secondary" className="mb-2">
-                          {artist.genre}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          {artist.monthlyListeners} monthly listeners
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                </motion.div>
-              ))}
+                  {track.title}
+                </Link>
+                <Link
+                  to={`/artists/${track.artist.slug}`}
+                  className="text-xs text-muted-foreground truncate hover:underline"
+                >
+                  {track.artist.name}
+                </Link>
+              </div>
+
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                >
+                  <Heart className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground w-10 text-right">
+                  {Math.floor(track.duration / 60)}:
+                  {(track.duration % 60).toString().padStart(2, "0")}
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-muted-foreground"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+    );
+  };
+
+  // 3. GRID RENDERER (Artists/Albums/Playlists)
+  const renderGrid = (
+    title: string,
+    items: any[],
+    type: "artist" | "album" | "playlist"
+  ) => {
+    if (!items?.length) return null;
+
+    return (
+      <section>
+        <h2 className="text-2xl font-bold mb-4">{title}</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {items.map((item, index) => (
+            <motion.div
+              key={item._id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.05 }}
+            >
+              <Link to={`/${type}s/${item.slug || item._id}`}>
+                <Card className="h-full border-none bg-transparent hover:bg-accent/50 transition-colors shadow-none">
+                  <CardContent className="p-3">
+                    <div className="relative mb-3 group">
+                      <ImageWithFallback
+                        src={type === "artist" ? item.avatar : item.coverImage}
+                        alt={item.title || item.name}
+                        className={cn(
+                          "w-full aspect-square object-cover shadow-sm",
+                          type === "artist" ? "rounded-full" : "rounded-md"
+                        )}
+                      />
+                      <div
+                        className={cn(
+                          "absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0",
+                          type === "artist" ? "bottom-0 right-0" : ""
+                        )}
+                      >
+                        <div className="bg-primary text-primary-foreground rounded-full p-3 shadow-xl">
+                          <Play className="h-5 w-5 fill-current" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <h4 className="font-semibold truncate text-sm mb-1">
+                      {item.title || item.name}
+                    </h4>
+
+                    <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                      {type === "artist" && <User className="h-3 w-3" />}
+                      {type === "album" && <Disc className="h-3 w-3" />}
+                      {type === "playlist" && <ListMusic className="h-3 w-3" />}
+
+                      {type === "artist" && "Artist"}
+                      {type === "album" && `${item.artist?.name} • Album`}
+                      {type === "playlist" && `By ${item.user?.fullName}`}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+    );
+  };
+
+  // --- MAIN RENDER ---
+  return (
+    <div className="container px-4 lg:px-8 py-6 min-h-[calc(100vh-80px)]">
+      {/* Search Input (Visible on Page mainly for mobile or emphasis) */}
+      <div className="mb-8 relative max-w-2xl mx-auto lg:mx-0">
+        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
+        <Input
+          className="pl-12 h-12 text-lg rounded-full bg-muted/50 border-transparent focus:bg-background focus:border-primary/50 transition-all"
+          placeholder="What do you want to listen to?"
+          value={localInput}
+          onChange={handleInputChange}
+        />
+      </div>
+
+      <AnimatePresence mode="wait">
+        {!query ? (
+          /* EMPTY STATE (Start Page) */
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            <div>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" /> Trending
+                Searches
+              </h2>
+              <div className="flex flex-wrap gap-3">
+                {trendingSearches.map((term) => (
+                  <Badge
+                    key={term}
+                    variant="secondary"
+                    className="px-4 py-2 cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors text-sm font-medium"
+                    onClick={() => handleTrendingClick(term)}
+                  >
+                    {term}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </section>
 
-          {/* Albums & Playlists */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Albums */}
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Albums</h2>
-              <div className="space-y-3">
-                {searchResults.albums.map((album, index) => (
-                  <motion.div
-                    key={album.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Link to={`/albums/${album.id}`}>
-                      <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-4">
-                            <ImageWithFallback
-                              src={album.image}
-                              alt={album.title}
-                              className="w-16 h-16 rounded object-cover"
-                            />
-                            <div className="flex-1">
-                              <h4 className="font-semibold mb-1">
-                                {album.title}
-                              </h4>
-                              <p className="text-sm text-muted-foreground">
-                                {album.artist} • {album.year}
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
-            </section>
-
-            {/* Playlists */}
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Playlists</h2>
-              <div className="space-y-3">
-                {searchResults.playlists.map((playlist, index) => (
-                  <motion.div
-                    key={playlist.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Link to={`/playlists/${playlist.id}`}>
-                      <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-4">
-                            <ImageWithFallback
-                              src={playlist.image}
-                              alt={playlist.title}
-                              className="w-16 h-16 rounded object-cover"
-                            />
-                            <div className="flex-1">
-                              <h4 className="font-semibold mb-1">
-                                {playlist.title}
-                              </h4>
-                              <p className="text-sm text-muted-foreground">
-                                By {playlist.creator} • {playlist.songs} songs
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
-            </section>
+            {/* Có thể thêm Browse Categories ở đây (Moods, Genres...) */}
+          </motion.div>
+        ) : isLoading ? (
+          /* LOADING STATE */
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <SearchSkeleton />
+          </motion.div>
+        ) : isError ? (
+          /* ERROR STATE */
+          <div className="text-center py-20 text-muted-foreground">
+            <p>Something went wrong. Please try again.</p>
           </div>
-        </motion.div>
-      )}
+        ) : (
+          /* RESULTS STATE */
+          <motion.div
+            key="results"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-10 pb-20"
+          >
+            {/* Nếu không có kết quả nào */}
+            {!data?.topResult &&
+              !data?.tracks.length &&
+              !data?.artists.length && (
+                <div className="text-center py-20">
+                  <h3 className="text-xl font-bold mb-2">
+                    No results found for "{query}"
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Please make sure your words are spelled correctly or use
+                    less or different keywords.
+                  </p>
+                </div>
+              )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+              {/* Left Column: Top Result */}
+              <div className="lg:col-span-2 space-y-8">{renderTopResult()}</div>
+
+              {/* Right Column: Songs */}
+              <div className="lg:col-span-3 space-y-8">{renderSongs()}</div>
+            </div>
+
+            <Separator className="my-6 opacity-50" />
+
+            {/* Other Grids */}
+            {renderGrid("Artists", data?.artists || [], "artist")}
+            {renderGrid("Albums", data?.albums || [], "album")}
+            {renderGrid("Playlists", data?.playlists || [], "playlist")}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-export default SearchPage;

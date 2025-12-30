@@ -7,6 +7,7 @@ export const AUTH_PATHS = {
   VERIFY_OTP: "/verify-otp",
   FORGOT_PASSWORD: "/forgot-password",
   AUTH_GOOGLE: "/auth/google",
+  FORCE_CHANGE_PASSWORD: "/force-change-password",
   RESET_PASSWORD: (token: string) => `/reset-password/${token}`,
 } as const;
 export const CLIENT_PATHS = {
@@ -16,9 +17,14 @@ export const CLIENT_PATHS = {
   ARTISTS: "artists",
   ALBUMS: "albums",
   PLAYLISTS: "playlists",
+  PLAYLIST_DETAIL: (slug: string) => `/playlists/${slug}`, // Hàm tạo link động
+  ALBUM_DETAIL: (slug: string) => `/albums/${slug}`, // Hàm tạo link động
+  ARTIST_DETAIL: (slug: string) => `/artists/${slug}`, // Hàm tạo link động
+
   SEARCH: "search",
   BROWSE: "browse",
   SETTINGS: "settings",
+  CLAIM_PROFILE: "claim-profile",
   // Track
   TRACK_DETAIL: (id: string) => `/tracks/${id}`, // Hàm tạo link động
   // User

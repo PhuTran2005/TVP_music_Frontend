@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { env } from "@/config/env";
 import type { Store, AnyAction } from "@reduxjs/toolkit"; // Import Type
+import { toast } from "sonner";
 
 // Định nghĩa Interface
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -79,8 +80,27 @@ api.interceptors.response.use(
     const originalRequest = error.config as CustomAxiosRequestConfig;
     if (!error.response || !originalRequest) return Promise.reject(error);
 
-    const { status } = error.response;
+    const { status, data } = error.response as any;
+    // ----------------------------------------------------------------
+    // 🛑 CASE 1: TÀI KHOẢN BỊ KHÓA (BLOCK) - Ưu tiên xử lý trước
+    // ----------------------------------------------------------------
+    // 🛑 XỬ LÝ KHÓA TÀI KHOẢN
+    if (
+      status === 403 &&
+      (data?.errorCode === "ACCOUNT_LOCKED" || data?.message?.includes("khóa"))
+    ) {
+      if (window.location.pathname === "/login") return Promise.reject(error);
 
+      // 1. Xóa Redux/Local data
+      store?.dispatch({ type: "auth/logout" });
+      setGlobalAccessToken(null);
+
+      // 2. Đá về Login kèm tín hiệu trên URL
+      // Dùng window.location để đảm bảo clean sạch memory cũ
+      window.location.href = "/login?error=locked";
+
+      return Promise.reject(error);
+    }
     // LOGIC 401 & REFRESH TOKEN
     if (status === 401 && !originalRequest._retry) {
       // 1. Nếu lỗi 401 đến từ chính API refresh hoặc login -> Logout luôn
@@ -109,9 +129,19 @@ api.interceptors.response.use(
       try {
         // Gọi API bằng instance sạch
         const { data } = await refreshApi.post("/auth/refresh-token");
-        const newAccessToken = data.accessToken;
+        const newAccessToken =
+          data.data?.accessToken || data.accessToken || data.token;
 
+        if (!newAccessToken) {
+          throw new Error("Không lấy được token mới");
+        }
+
+        setGlobalAccessToken(newAccessToken);
+        api.defaults.headers.common[
+          "Authorization"
+        ] = `Bearer ${newAccessToken}`;
         // Cập nhật Redux (Store sẽ tự update ngược lại biến currentAccessToken qua subscribe)
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         store?.dispatch({
           type: "auth/refreshSuccess",
           payload: { accessToken: newAccessToken },
@@ -121,12 +151,23 @@ api.interceptors.response.use(
         processQueue(null, newAccessToken);
 
         // Gọi lại request gốc bị lỗi lúc nãy
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshError: any) {
-        // Refresh thất bại -> Logout sạch sẽ
+        // Xử lý hàng đợi thất bại
         processQueue(refreshError, null);
-        store?.dispatch({ type: "auth/logout" });
+
+        // 👇 LOGIC MỚI: Chỉ Logout khi chắc chắn Refresh Token đã chết
+        const status = refreshError.response?.status;
+
+        if (status === 400 || status === 401 || status === 403) {
+          // Lúc này mới chắc chắn là phiên đăng nhập hết hạn thật sự
+          store?.dispatch({ type: "auth/logout" });
+          setGlobalAccessToken(null);
+        }
+
+        // Nếu là lỗi 500, lỗi mạng (network error)... thì KHÔNG logout.
+        // Để người dùng F5 lại trang vẫn còn session.
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

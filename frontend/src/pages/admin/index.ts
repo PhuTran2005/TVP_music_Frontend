@@ -1,9 +1,11 @@
 import { lazy } from "react";
 export const DashboardPage = lazy(() => import("./DashboardPage"));
 export const UserPage = lazy(() => import("./UserPage"));
-export const SongPage = lazy(() => import("./SongPage"));
-export const ArtistPage = lazy(() => import("./ArtistPage"));
+export const SongPage = lazy(() => import("./TrackManagementPage"));
+export const ArtistManagementPage = lazy(
+  () => import("./ArtistManagementPage")
+);
 export const GenrePage = lazy(() => import("./GenrePage"));
-export const AlbumPage = lazy(() => import("./AlbumPage"));
+export const AlbumManagementPage = lazy(() => import("./AlbumManagementPage"));
 export const AnalyticPage = lazy(() => import("./AnalyticPage"));
 export const SettingPage = lazy(() => import("./SettingPage"));

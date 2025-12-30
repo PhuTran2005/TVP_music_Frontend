@@ -1,199 +1,355 @@
-import PageHeader from "@/components/ui/PageHeader";
-import { cn } from "@/lib/utils";
-import { generateData } from "@/utils/generateData";
+import { useState } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  MoreHorizontal,
   Plus,
+  Search,
+  Shield,
+  ShieldAlert,
+  Users as UsersIcon,
+  MoreHorizontal,
+  Lock,
+  Unlock,
+  PenSquare,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-const usersData = generateData(32, (i: number) => ({
-  id: i + 1,
-  name: [
-    "Alex Doe",
-    "Sarah Smith",
-    "John Wick",
-    "Emily Blunt",
-    "Michael Scott",
-  ][i % 5],
-  email: `user${i}@example.com`,
-  role: ["Admin", "User", "Artist", "User", "Manager"][i % 5],
-  status: i % 5 === 0 ? "Inactive" : "Active",
-  img: `https://i.pravatar.cc/150?img=${(i % 10) + 1}`,
-}));
-const Pagination = ({
-  currentPage,
-  totalPages,
-  onPageChange,
-  totalItems,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  totalItems: number;
-}) => (
-  <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-    <span className="text-sm text-gray-500 dark:text-gray-400">
-      Showing{" "}
-      <span className="font-medium text-gray-900 dark:text-white">
-        {(currentPage - 1) * 5 + 1}
-      </span>{" "}
-      to{" "}
-      <span className="font-medium text-gray-900 dark:text-white">
-        {Math.min(currentPage * 5, totalItems)}
-      </span>{" "}
-      of{" "}
-      <span className="font-medium text-gray-900 dark:text-white">
-        {totalItems}
-      </span>{" "}
-      results
-    </span>
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="p-2 rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        <ChevronLeft className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="p-2 rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        <ChevronRight className="w-4 h-4" />
-      </button>
-    </div>
-  </div>
-);
-const TableSkeleton = ({ rows = 5, cols = 5 }) => (
-  <>
-    {Array.from({ length: rows }).map((_, i) => (
-      <tr
-        key={i}
-        className="animate-pulse border-b border-gray-100 dark:border-white/5"
-      >
-        {Array.from({ length: cols }).map((_, j) => (
-          <td key={j} className="px-6 py-4">
-            <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-full"></div>
-          </td>
-        ))}
-      </tr>
-    ))}
-  </>
-);
+import {
+  useAdminUsers,
+  useBlockUser,
+} from "@/features/user/hooks/useUserAdmin";
+import { useDebounce } from "@/hooks/useDebounce";
+import { APP_CONFIG } from "@/config/constants";
+import { cn } from "@/lib/utils";
+import type { User } from "@/features/user/types";
+import { getInitialsTextAvartar } from "@/utils/genTextAvartar";
+
+// --- UI Components ---
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import Pagination from "@/utils/pagination";
+import MusicResult from "@/components/ui/Result";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
+import CreateUserModal from "@/features/user/components/create-user-modal";
+import UpdateUserModal from "@/features/user/components/UpdateUserModal";
+import TableSkeleton from "@/components/ui/TableSkeleton";
+
+const roles = [
+  { key: "All", value: "all" },
+  { key: "Admin", value: "admin" },
+  { key: "Artist", value: "artist" }, // Lưu ý: API có thể phân biệt hoa thường
+  { key: "User", value: "user" },
+];
 
 const UsersPage = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  // --- STATE ---
   const [page, setPage] = useState(1);
-  const itemsPerPage = 8;
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, [page]);
-  const currentData = usersData.slice(
-    (page - 1) * itemsPerPage,
-    page * itemsPerPage
-  );
-  return (
-    <>
-      <PageHeader
-        title="Users"
-        subtitle="Manage user access."
-        action={
-          <div className="flex gap-2">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/10">
-              <Download className="w-4 h-4" /> Export
-            </button>
-            <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-lg">
-              <Plus className="w-4 h-4" /> Add User
-            </button>
-          </div>
-        }
-      />
-      <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-white/5 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider bg-gray-50/50 dark:bg-white/[0.02]">
-                <th className="px-6 py-4 font-semibold">User Info</th>
-                <th className="px-6 py-4 font-semibold">Role</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm divide-y divide-gray-100 dark:divide-white/5">
-              {isLoading ? (
-                <TableSkeleton rows={8} cols={4} />
-              ) : (
-                currentData.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="group hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={user.img}
-                          className="w-10 h-10 rounded-full object-cover shadow-sm"
-                        />
-                        <div>
-                          <span className="font-semibold text-gray-900 dark:text-white block">
-                            {user.name}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {user.email}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={cn(
-                          "px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1.5",
-                          user.status === "Active"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
-                            : "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-400"
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            user.status === "Active"
-                              ? "bg-emerald-500"
-                              : "bg-gray-500"
-                          )}
-                        />
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                        <MoreHorizontal className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination
-          currentPage={page}
-          totalPages={Math.ceil(usersData.length / itemsPerPage)}
-          onPageChange={setPage}
-          totalItems={usersData.length}
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string | undefined>(undefined);
+
+  // --- MODAL STATE ---
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [userToBlock, setUserToBlock] = useState<User | null>(null);
+  const [userToEdit, setUserToEdit] = useState<User | null>(null);
+
+  // --- HOOKS ---
+  const debouncedSearch = useDebounce(searchTerm, 500);
+  const { data, isLoading, isError, isFetching } = useAdminUsers({
+    page,
+    limit: APP_CONFIG.PAGINATION_LIMIT,
+    keyword: debouncedSearch,
+    role: roleFilter,
+  });
+  const { mutate: blockUser } = useBlockUser();
+
+  const userData = data?.data.data || [];
+  const totalPages = data?.data.meta.totalPages || 0;
+  const totalItems = data?.data.meta.totalItems || 0;
+
+  // --- HANDLERS ---
+  const handleConfirmBlock = () => {
+    if (userToBlock) {
+      blockUser(userToBlock._id, {
+        onSuccess: () => setUserToBlock(null),
+      });
+    }
+  };
+
+  const renderRoleBadge = (role: string) => {
+    const roleLower = role.toLowerCase();
+    if (roleLower === "admin") {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <ShieldAlert className="size-3" /> Admin
+        </Badge>
+      );
+    }
+    if (roleLower === "artist") {
+      return (
+        <Badge
+          variant="secondary"
+          className="bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 gap-1 hover:bg-amber-200"
+        >
+          <Shield className="size-3" /> Artist
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="gap-1 text-muted-foreground">
+        <UsersIcon className="size-3" /> User
+      </Badge>
+    );
+  };
+
+  if (isError) {
+    return (
+      <div className="h-[60vh] flex items-center justify-center">
+        <MusicResult
+          status="error"
+          title="Failed to load users"
+          description="Please try again later."
         />
       </div>
-    </>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* --- HEADER & ACTIONS --- */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Users Management
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage your team members and their account permissions here.
+          </p>
+        </div>
+        <Button
+          onClick={() => setIsCreateOpen(true)}
+          className="shadow-lg shadow-primary/20"
+        >
+          <Plus className="size-4 mr-2" /> Add User
+        </Button>
+      </div>
+
+      {/* --- FILTERS --- */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card p-4 rounded-xl border shadow-sm">
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search users..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
+            className="pl-9 bg-background/50"
+          />
+        </div>
+
+        <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+          {roles.map((role) => (
+            <Button
+              key={role.key}
+              variant={
+                (role.value === "all" && !roleFilter) ||
+                role.value === roleFilter
+                  ? "secondary"
+                  : "ghost"
+              }
+              size="sm"
+              onClick={() => {
+                setRoleFilter(role.value === "all" ? undefined : role.value);
+                setPage(1);
+              }}
+              className={cn(
+                "rounded-full px-4 text-xs font-medium h-8 border",
+                (role.value === "all" && !roleFilter) ||
+                  role.value === roleFilter
+                  ? "border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
+                  : "border-transparent text-muted-foreground"
+              )}
+            >
+              {role.key}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* --- TABLE --- */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="w-[300px]">User</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden md:table-cell">Joined</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading || (isFetching && page === 1) ? (
+              <TableSkeleton rows={APP_CONFIG.PAGINATION_LIMIT} cols={5} />
+            ) : userData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-[400px]">
+                  <MusicResult
+                    status="empty"
+                    title="No users found"
+                    description="Try adjusting your search or filters to find what you're looking for."
+                  />
+                </TableCell>
+              </TableRow>
+            ) : (
+              userData.map((user: User) => (
+                <TableRow key={user._id} className="group">
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="size-9 border">
+                        <AvatarImage
+                          src={user.avatar}
+                          alt={user.username}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                          {getInitialsTextAvartar(user?.fullName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm text-foreground truncate max-w-[150px]">
+                          {user.fullName}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                          {user.email}
+                        </span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{renderRoleBadge(user.role)}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={user.isActive ? "default" : "destructive"}
+                      className={cn(
+                        "rounded-full font-medium shadow-none",
+                        user.isActive
+                          ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 border-emerald-500/20 dark:text-emerald-400"
+                          : ""
+                      )}
+                    >
+                      {user.isActive ? "Active" : "Blocked"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground text-xs font-mono">
+                    {new Date(user.createdAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground"
+                        >
+                          <MoreHorizontal className="size-4" />
+                          <span className="sr-only">Open menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => setUserToEdit(user)}>
+                          <PenSquare className="mr-2 size-4" /> Edit details
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setUserToBlock(user)}
+                          className={cn(
+                            user.isActive
+                              ? "text-destructive focus:text-destructive"
+                              : "text-emerald-600 focus:text-emerald-600"
+                          )}
+                        >
+                          {user.isActive ? (
+                            <>
+                              <Lock className="mr-2 size-4" /> Block user
+                            </>
+                          ) : (
+                            <>
+                              <Unlock className="mr-2 size-4" /> Unblock user
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* --- FOOTER PAGINATION --- */}
+      {userData.length > 0 && (
+        <div className="pt-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages || 1}
+            onPageChange={setPage}
+            totalItems={totalItems}
+            itemsPerPage={APP_CONFIG.PAGINATION_LIMIT}
+          />
+        </div>
+      )}
+
+      {/* --- MODALS --- */}
+      <CreateUserModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
+
+      {userToEdit && (
+        <UpdateUserModal
+          isOpen={!!userToEdit}
+          onClose={() => setUserToEdit(null)}
+          userToEdit={userToEdit}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={!!userToBlock}
+        onCancel={() => setUserToBlock(null)}
+        onConfirm={handleConfirmBlock}
+        title={userToBlock?.isActive ? "Block Access" : "Restore Access"}
+        description={
+          userToBlock?.isActive
+            ? "Are you sure you want to block this user? They will immediately lose access to the platform."
+            : "Are you sure you want to unblock this user? They will regain access immediately."
+        }
+        confirmLabel={userToBlock?.isActive ? "Block User" : "Unblock User"}
+        isDestructive={userToBlock?.isActive}
+      />
+    </div>
   );
 };
+
 export default UsersPage;

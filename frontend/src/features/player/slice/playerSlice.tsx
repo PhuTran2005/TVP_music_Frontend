@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "@/store/store";
-import type { Track } from "@/features/player/types";
+import type { Track } from "@/features/track/types";
 
 // 2. Định nghĩa State của Player
 interface PlayerState {
@@ -57,7 +57,13 @@ const playerSlice = createSlice({
       state.isPlaying = true;
       state.isLoading = true;
     },
-
+    stopListening: (state) => {
+      state.currentTrack = null;
+      state.isPlaying = false;
+      state.isLoading = false;
+      state.queue = [];
+      state.currentIndex = -1;
+    },
     // ➤ ĐIỀU KHIỂN CƠ BẢN
     setIsPlaying: (state, action: PayloadAction<boolean>) => {
       state.isPlaying = action.payload;
@@ -80,7 +86,9 @@ const playerSlice = createSlice({
       // Logic Repeat All: Nếu hết bài thì quay lại đầu
       else if (nextIndex >= state.queue.length) {
         if (state.repeatMode === "all") nextIndex = 0;
-        else {
+        else if (state.repeatMode === "one") {
+          nextIndex = state.currentIndex;
+        } else {
           // Nếu không repeat, dừng lại và không làm gì hoặc stop
           state.isPlaying = false;
           return;
@@ -143,6 +151,7 @@ export const {
   toggleMute,
   toggleShuffle,
   toggleRepeat,
+  stopListening,
 } = playerSlice.actions;
 
 // Selectors

@@ -207,7 +207,7 @@ const VerifyOtpForm: React.FC<VerifyOtpFormProps> = ({ email }) => {
   const executeVerify = async (codeToVerify: string) => {
     if (!email) return;
     if (codeToVerify.length !== 6) return; // Chặn nếu chưa đủ số
-    console.log("Verifying OTP:", codeToVerify);
+
     setIsLoading(true);
 
     try {

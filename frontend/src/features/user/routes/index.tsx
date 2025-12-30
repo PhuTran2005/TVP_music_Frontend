@@ -1,36 +1,11 @@
+import { CLIENT_PATHS } from "@/config/paths";
+import { ClaimProfilePage } from "@/pages";
 import { type RouteObject } from "react-router-dom";
-import {
-  GoogleCallbackPage,
-  LoginPage,
-  LogoutPage,
-  RegisterPage,
-  VerifyOtpPage,
-} from "@/pages";
 
 // 1. Nhóm dành cho khách (Guest Only) - Đã login thì cấm vào
-export const guestAuthRoutes: RouteObject[] = [
+export const userRoutes: RouteObject[] = [
   {
-    path: "/login",
-    element: <LoginPage />,
-  },
-  {
-    path: "/register",
-    element: <RegisterPage />,
-  },
-  {
-    path: "/verify-otp",
-    element: <VerifyOtpPage />,
-  },
-  {
-    path: "/auth/google",
-    element: <GoogleCallbackPage />,
-  },
-];
-
-// 2. Nhóm dành cho người đã login (Protected)
-export const protectedAuthRoutes: RouteObject[] = [
-  {
-    path: "/logout",
-    element: <LogoutPage />,
+    path: CLIENT_PATHS.CLAIM_PROFILE,
+    element: <ClaimProfilePage />,
   },
 ];

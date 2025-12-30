@@ -24,7 +24,6 @@ const GoogleCallbackPage = () => {
         .then((res) => {
           // ✅ SỬA Ở ĐÂY: Dữ liệu user nằm trong res.data
           const user = res.data;
-          console.log(res);
           dispatch(
             login({
               accessToken,
@@ -39,8 +38,13 @@ const GoogleCallbackPage = () => {
           navigate("/");
         })
         .catch((err) => {
-          console.error("Lỗi lấy thông tin user:", err);
-          navigate("/login");
+          const errorCode = err.response?.data?.errorCode;
+          if (errorCode === "ACCOUNT_LOCKED") {
+            // Chuyển về login với cờ locked
+            navigate("/login?error=locked");
+          } else {
+            navigate("/login?error=auth_failed");
+          }
         });
     } else {
       navigate("/login");

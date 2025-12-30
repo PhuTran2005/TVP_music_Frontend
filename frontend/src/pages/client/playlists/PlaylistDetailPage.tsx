@@ -1,440 +1,547 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { useParams, Link } from "react-router-dom";
+import React, { useState, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Play,
+  Pause,
+  Clock,
   Heart,
   MoreHorizontal,
-  Clock,
-  Users,
   Lock,
-  Edit3,
+  PenSquare,
+  ListMusic,
+  Trash2,
+  PlusCircle,
   Share2,
-  Download,
+  Calendar,
+  AlertCircle,
+  Music2,
+  User,
+  Disc3,
+  SearchX,
 } from "lucide-react";
-import { Button } from "../../../components/ui/button";
-import { Badge } from "../../../components/ui/badge";
+import { cn } from "@/lib/utils";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import { formatDuration } from "@/utils/track-helper";
+
+// Hooks & Store
+import { usePlaylistDetail } from "@/features/playlist/hooks/usePlaylist";
+import { useAppSelector } from "@/store/store";
+
+// UI Components
+import { Button } from "@/components/ui/button";
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "../../../components/ui/avatar";
-import { Separator } from "../../../components/ui/separator";
-import { ImageWithFallback } from "../../../components/figma/ImageWithFallback";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-// Mock data
-const playlistData = {
-  id: 1,
-  title: "Chill Vibes",
-  description: "Perfect for relaxing and unwinding after a long day",
-  image: "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=600",
-  creator: {
-    id: 1,
-    name: "You",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108755-2616c5e93413?w=100",
-  },
-  isOwn: true,
-  isPublic: false,
-  followers: 0,
-  songs: 15,
-  duration: "1h 12m",
-  lastUpdated: "2 days ago",
-  createdDate: "January 15, 2024",
-  tracks: [
-    {
-      id: 1,
-      title: "Midnight Echoes",
-      artist: "Aurora Dreams",
-      artistId: 1,
-      album: "Digital Dreams",
-      albumId: 1,
-      duration: "3:24",
-      image:
-        "https://images.unsplash.com/photo-1629923759854-156b88c433aa?w=100",
-      addedDate: "2 days ago",
-      addedBy: "You",
-    },
-    {
-      id: 2,
-      title: "Ocean Waves",
-      artist: "Calm Collective",
-      artistId: 2,
-      album: "Nature Sounds",
-      albumId: 2,
-      duration: "5:18",
-      image:
-        "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=100",
-      addedDate: "3 days ago",
-      addedBy: "You",
-    },
-    {
-      id: 3,
-      title: "Soft Memories",
-      artist: "Maya Chen",
-      artistId: 3,
-      album: "Acoustic Stories",
-      albumId: 3,
-      duration: "4:12",
-      image:
-        "https://images.unsplash.com/photo-1629735951612-65b0f1724031?w=100",
-      addedDate: "1 week ago",
-      addedBy: "You",
-    },
-    {
-      id: 4,
-      title: "Ambient Dreams",
-      artist: "Synth Wave",
-      artistId: 4,
-      album: "Digital Horizons",
-      albumId: 4,
-      duration: "6:45",
-      image:
-        "https://images.unsplash.com/photo-1571974599782-87624638275c?w=100",
-      addedDate: "1 week ago",
-      addedBy: "You",
-    },
-    {
-      id: 5,
-      title: "Peaceful Mind",
-      artist: "Meditation Masters",
-      artistId: 5,
-      album: "Inner Peace",
-      albumId: 5,
-      duration: "4:33",
-      image:
-        "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=100",
-      addedDate: "2 weeks ago",
-      addedBy: "You",
-    },
-  ],
-};
+// Modals
+import { EditPlaylistTracksModal } from "@/features/playlist/components/EditPlaylistTracksModal";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
+import { PlaylistDetailSkeleton } from "@/features/playlist/components/PlaylistDetailSkeleton";
+import PlaylistModal from "@/features/playlist/components/PlaylistModal";
+import { Track } from "@/features/track/types";
 
-export function PlaylistDetailPage() {
-  const { id } = useParams();
-  const [isLiked, setIsLiked] = useState(false);
-  const [likedSongs, setLikedSongs] = useState(new Set([1, 3]));
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
+dayjs.extend(relativeTime);
 
-  const toggleLike = (songId: number) => {
-    const newLiked = new Set(likedSongs);
-    if (newLiked.has(songId)) {
-      newLiked.delete(songId);
-    } else {
-      newLiked.add(songId);
-    }
-    setLikedSongs(newLiked);
-  };
+const PlaylistDetailPage = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
 
-  const playTrack = (songId: number) => {
-    setCurrentlyPlaying(currentlyPlaying === songId ? null : songId);
-  };
+  const [isEditMetaOpen, setIsEditMetaOpen] = useState(false);
+  const [isManageTracksOpen, setIsManageTracksOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  // --- DATA ---
+  const { data, isLoading, isError } = usePlaylistDetail(slug!);
+  const playlist = data?.data;
+  const { user } = useAppSelector((state) => state.auth);
+
+  // --- PLAYER MOCK ---
+  const activeTrackId = "track_123";
+  const isGlobalPlaying = false;
+
+  const isOwner = useMemo(() => {
+    return playlist?.user?._id === user?._id || user?.role === "admin";
+  }, [playlist, user]);
+
+  // Fallback theme color nếu không có
+  const themeColor = useMemo(
+    () => playlist?.themeColor || "#7c3aed", // Violet default
+    [playlist]
+  );
+
+  // --- 1. LOADING STATE ---
+  if (isLoading) return <PlaylistDetailSkeleton />;
+
+  // --- 2. ERROR / NOT FOUND STATE ---
+  if (isError || !playlist)
+    return <PlaylistNotFound onBack={() => navigate("/")} />;
 
   return (
-    <div className="min-h-screen">
-      {/* Playlist Header */}
-      <section className="bg-gradient-to-b from-muted/50 to-background pt-8 pb-8">
-        <div className="container px-4 lg:px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="flex flex-col lg:flex-row items-start lg:items-end gap-8"
-          >
-            {/* Playlist Cover */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="shrink-0"
-            >
-              <div className="relative group">
-                <ImageWithFallback
-                  src={playlistData.image}
-                  alt={playlistData.title}
-                  className="w-60 h-60 lg:w-80 lg:h-80 rounded-2xl object-cover shadow-2xl"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl flex items-center justify-center">
-                  <Button
-                    size="lg"
-                    className="bg-white text-black hover:bg-white/90"
-                  >
-                    <Play className="h-6 w-6 mr-2" fill="currentColor" />
-                    Play Playlist
-                  </Button>
-                </div>
+    <div className="relative min-h-screen bg-background text-foreground animate-in fade-in duration-700 overflow-x-hidden selection:bg-primary/20 selection:text-primary">
+      {/* --- LAYER 1: DYNAMIC GRADIENT BACKDROP (Adaptive Light/Dark) --- */}
+      {/* Sử dụng opacity thấp hơn để hòa trộn tốt với cả nền trắng và đen */}
+      <div
+        className="absolute inset-0 h-[500px] md:h-[650px] pointer-events-none transition-all duration-1000 ease-out"
+        style={{
+          background: `linear-gradient(to bottom, ${themeColor}40 0%, ${themeColor}05 60%, transparent 100%)`,
+        }}
+      />
+
+      <div className="relative z-10">
+        {/* 1. HERO SECTION */}
+        <header className="flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-10 p-6 md:p-10 pt-20 md:pt-28">
+          {/* Cover Art Container */}
+          <div className="group relative shrink-0 shadow-2xl rounded-xl overflow-hidden w-52 h-52 sm:w-60 sm:h-60 md:w-64 md:h-64 border border-border/50 bg-card">
+            {playlist.coverImage ? (
+              <img
+                src={playlist.coverImage}
+                alt={playlist.title}
+                className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+            ) : (
+              <div className="size-full bg-muted/50 flex items-center justify-center">
+                <ListMusic className="size-20 text-muted-foreground/30" />
               </div>
-            </motion.div>
+            )}
 
-            {/* Playlist Info */}
-            <div className="flex-1 min-w-0">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
+            {/* Overlay Edit (Chỉ hiện khi hover) */}
+            {isOwner && (
+              <div
+                onClick={() => setIsEditMetaOpen(true)}
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]"
               >
-                <div className="flex items-center gap-2 mb-4">
-                  <Badge variant="secondary">Playlist</Badge>
-                  {playlistData.isPublic ? (
-                    <Badge variant="outline">
-                      <Users className="h-3 w-3 mr-1" />
-                      Public
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">
-                      <Lock className="h-3 w-3 mr-1" />
-                      Private
-                    </Badge>
-                  )}
-                </div>
+                <PenSquare className="size-10 text-white mb-2 drop-shadow-md" />
+                <span className="text-white font-bold text-[10px] uppercase tracking-widest drop-shadow-md">
+                  Sửa ảnh bìa
+                </span>
+              </div>
+            )}
+          </div>
 
-                <h1 className="text-4xl lg:text-6xl font-bold mb-4 leading-tight">
-                  {playlistData.title}
-                </h1>
+          {/* Info Section */}
+          <div className="flex flex-col gap-3 w-full text-center md:text-left min-w-0">
+            <div className="flex items-center justify-center md:justify-start gap-2">
+              <Badge
+                variant="outline"
+                className="bg-background/50 backdrop-blur-sm text-[9px] font-bold uppercase tracking-widest px-2.5 h-6 border-primary/20 text-primary"
+              >
+                {playlist.isSystem ? "System Curated" : "Playlist"}
+              </Badge>
 
-                <p className="text-muted-foreground mb-6 max-w-2xl leading-relaxed">
-                  {playlistData.description}
+              {playlist.visibility === "private" && (
+                <Badge
+                  variant="destructive"
+                  className="text-[9px] font-bold h-6 px-2 uppercase tracking-wider"
+                >
+                  <Lock className="size-2.5 mr-1" /> Private
+                </Badge>
+              )}
+            </div>
+
+            <h1
+              className={cn(
+                "text-3xl sm:text-5xl md:text-7xl font-black tracking-tight leading-[1.1] line-clamp-2 text-foreground",
+                isOwner &&
+                  "cursor-pointer hover:underline decoration-primary/50 underline-offset-8 transition-all"
+              )}
+              onClick={() => isOwner && setIsEditMetaOpen(true)}
+            >
+              {playlist.title}
+            </h1>
+
+            {playlist.description ? (
+              <p className="text-sm md:text-base text-muted-foreground font-medium line-clamp-2 max-w-3xl mt-1">
+                {playlist.description}
+              </p>
+            ) : (
+              isOwner && (
+                <p
+                  className="text-sm text-muted-foreground/60 italic cursor-pointer hover:text-primary transition-colors"
+                  onClick={() => setIsEditMetaOpen(true)}
+                >
+                  Thêm mô tả cho playlist...
                 </p>
+              )
+            )}
 
-                <div className="flex items-center gap-2 mb-6">
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={playlistData.creator.avatar} />
-                    <AvatarFallback>
-                      {playlistData.creator.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Link
-                    to={`/profile/${playlistData.creator.id}`}
-                    className="font-semibold hover:text-primary transition-colors"
-                  >
-                    {playlistData.creator.name}
-                  </Link>
-                  <span>•</span>
-                  <span>{playlistData.songs} songs</span>
-                  <span>•</span>
-                  <span>{playlistData.duration}</span>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <Button size="lg" className="bg-primary hover:bg-primary/90">
-                    <Play className="h-5 w-5 mr-2" fill="currentColor" />
-                    Play
-                  </Button>
-
-                  {!playlistData.isOwn && (
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => setIsLiked(!isLiked)}
-                    >
-                      <Button variant="outline" size="lg">
-                        <motion.div
-                          animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <Heart
-                            className={`h-5 w-5 mr-2 ${
-                              isLiked ? "fill-red-500 text-red-500" : ""
-                            }`}
-                          />
-                        </motion.div>
-                        {isLiked ? "Liked" : "Like"}
-                      </Button>
-                    </motion.button>
-                  )}
-
-                  <Button variant="ghost" size="lg">
-                    <Download className="h-5 w-5 mr-2" />
-                    Download
-                  </Button>
-
-                  <Button variant="ghost" size="lg">
-                    <Share2 className="h-5 w-5 mr-2" />
-                    Share
-                  </Button>
-
-                  {playlistData.isOwn && (
-                    <Button variant="ghost" size="lg">
-                      <Edit3 className="h-5 w-5 mr-2" />
-                      Edit
-                    </Button>
-                  )}
-
-                  <Button variant="ghost" size="lg">
-                    <MoreHorizontal className="h-5 w-5" />
-                  </Button>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Track List */}
-      <section className="container px-4 lg:px-6 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          {/* Track List Header */}
-          <div className="flex items-center gap-4 px-4 py-2 text-sm text-muted-foreground border-b border-border/50 mb-4">
-            <div className="w-8 text-center">#</div>
-            <div className="w-12"></div>
-            <div className="flex-1">Title</div>
-            <div className="hidden md:block w-32">Album</div>
-            <div className="hidden lg:block w-24">Date added</div>
-            <div className="w-16 text-center">
-              <Clock className="h-4 w-4 mx-auto" />
-            </div>
-          </div>
-
-          {/* Tracks */}
-          <div className="space-y-1">
-            {playlistData.tracks.map((song, index) => (
-              <motion.div
-                key={song.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 + index * 0.05 }}
-                className={`group flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-all duration-200 cursor-pointer ${
-                  currentlyPlaying === song.id ? "bg-primary/10" : ""
-                }`}
-                onClick={() => playTrack(song.id)}
+            {/* Metadata Footer */}
+            <div className="flex items-center justify-center md:justify-start flex-wrap gap-x-4 gap-y-2 mt-4 text-sm font-medium text-foreground/80">
+              <div
+                className="flex items-center gap-2 group cursor-pointer transition-colors hover:text-primary"
+                onClick={() => navigate(`/profile/${playlist.user?._id}`)}
               >
-                <div className="w-8 text-center">
-                  {currentlyPlaying === song.id ? (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="text-primary"
-                    >
-                      <div className="flex items-center justify-center">
-                        <div className="w-1 h-3 bg-primary animate-pulse mr-0.5"></div>
-                        <div
-                          className="w-1 h-2 bg-primary animate-pulse mr-0.5"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-1 h-4 bg-primary animate-pulse mr-0.5"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                        <div
-                          className="w-1 h-2 bg-primary animate-pulse"
-                          style={{ animationDelay: "0.3s" }}
-                        ></div>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <>
-                      <span className="text-muted-foreground group-hover:hidden">
-                        {index + 1}
-                      </span>
-                      <Play
-                        className="h-4 w-4 hidden group-hover:block text-foreground"
-                        fill="currentColor"
-                      />
-                    </>
-                  )}
-                </div>
+                <Avatar className="size-6 border border-border shadow-sm">
+                  <AvatarImage src={playlist.user?.avatar} />
+                  <AvatarFallback className="bg-muted text-[10px] uppercase">
+                    {playlist.user?.fullName?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-bold">{playlist.user?.fullName}</span>
+              </div>
+              <span className="text-muted-foreground hidden sm:inline">•</span>
 
-                <ImageWithFallback
-                  src={song.image}
-                  alt={song.title}
-                  className="w-12 h-12 rounded object-cover"
-                />
+              <div className="flex items-center gap-1.5">
+                <Disc3 className="size-4 text-muted-foreground" />
+                <span>{playlist.totalTracks || 0} bài hát</span>
+              </div>
+              <span className="text-muted-foreground hidden sm:inline">•</span>
 
-                <div className="flex-1 min-w-0">
-                  <h4
-                    className={`font-medium truncate ${
-                      currentlyPlaying === song.id ? "text-primary" : ""
-                    }`}
-                  >
-                    {song.title}
-                  </h4>
-                  <Link
-                    to={`/artists/${song.artistId}`}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
-                      e.stopPropagation()
-                    }
-                  >
-                    {song.artist}
-                  </Link>
-                </div>
-
-                <div className="hidden md:block w-32">
-                  <Link
-                    to={`/albums/${song.albumId}`}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors truncate block"
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
-                      e.stopPropagation()
-                    }
-                  >
-                    {song.album}
-                  </Link>
-                </div>
-
-                <div className="hidden lg:block w-24 text-sm text-muted-foreground">
-                  {song.addedDate}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      e.stopPropagation();
-                      toggleLike(song.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Heart
-                      className={`h-4 w-4 ${
-                        likedSongs.has(song.id)
-                          ? "fill-red-500 text-red-500"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    />
-                  </motion.button>
-                  <span className="text-sm text-muted-foreground w-12 text-center">
-                    {song.duration}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) =>
-                      e.stopPropagation()
-                    }
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
+              <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                Cập nhật {dayjs(playlist.updatedAt).fromNow()}
+              </span>
+            </div>
           </div>
-        </motion.div>
+        </header>
 
-        <Separator className="my-8" />
+        {/* 2. STICKY ACTIONS BAR */}
+        <div className="sticky top-0 z-30 px-6 md:px-10 py-4 flex items-center justify-between backdrop-blur-xl bg-background/80 border-b border-border/40 transition-all">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <Button
+              size="icon"
+              className="size-12 sm:size-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-all hover:shadow-primary/25"
+            >
+              <Play className="size-6 sm:size-7 fill-current ml-1" />
+            </Button>
 
-        {/* Playlist Info */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
-          className="text-sm text-muted-foreground"
-        >
-          <p className="mb-2">Created on {playlistData.createdDate}</p>
-          <p>Last updated {playlistData.lastUpdated}</p>
-          {playlistData.followers > 0 && (
-            <p className="mt-2">
-              {playlistData.followers.toLocaleString()} followers
-            </p>
+            {isOwner && (
+              <div className="flex items-center gap-2">
+                <TooltipAction
+                  label="Quản lý bài hát"
+                  icon={<ListMusic className="size-5" />}
+                  onClick={() => setIsManageTracksOpen(true)}
+                />
+                <TooltipAction
+                  label="Sửa thông tin"
+                  icon={<PenSquare className="size-5" />}
+                  onClick={() => setIsEditMetaOpen(true)}
+                />
+              </div>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full h-11 w-11 transition-colors"
+            >
+              <Heart className="size-6" />
+            </Button>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground h-11 w-11 rounded-full"
+              >
+                <MoreHorizontal className="size-7" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-56 rounded-xl p-1.5 border-border/50 shadow-xl bg-popover"
+            >
+              <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
+                <PlusCircle className="size-4" /> Thêm vào hàng chờ
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
+                <Share2 className="size-4" /> Chia sẻ Playlist
+              </DropdownMenuItem>
+              {isOwner && (
+                <>
+                  <DropdownMenuSeparator className="bg-border/50 my-1" />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-3 py-2.5 font-bold rounded-lg cursor-pointer"
+                    onClick={() => setIsDeleteOpen(true)}
+                  >
+                    <Trash2 className="size-4" /> Xóa Playlist
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* 3. TRACKLIST SECTION */}
+        <section className="px-2 sm:px-6 md:px-10 pt-6 pb-32">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-b border-border/40 text-muted-foreground/70 uppercase text-[11px] font-bold tracking-wider">
+                <TableHead className="w-12 sm:w-14 text-center">#</TableHead>
+                <TableHead>Tiêu đề</TableHead>
+                <TableHead className="hidden md:table-cell">Album</TableHead>
+                <TableHead className="hidden lg:table-cell">
+                  Ngày thêm
+                </TableHead>
+                <TableHead className="w-16 sm:w-20 text-right">
+                  <Clock className="size-4 ml-auto" />
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {/* --- TRƯỜNG HỢP 1: CÓ DỮ LIỆU --- */}
+              {playlist.tracks?.length > 0 ? (
+                playlist.tracks.map((track: Track, index: number) => {
+                  const isTrackActive = activeTrackId === track._id;
+                  const isPlayingThis = isTrackActive && isGlobalPlaying;
+
+                  return (
+                    <TableRow
+                      key={track._id}
+                      className={cn(
+                        "group border-none transition-colors duration-200 rounded-lg cursor-pointer h-14 sm:h-16",
+                        isTrackActive
+                          ? "bg-primary/10 hover:bg-primary/15" // Active state
+                          : "hover:bg-muted/50" // Hover state chuẩn light/dark
+                      )}
+                    >
+                      {/* Index / Animation */}
+                      <TableCell className="text-center relative p-0">
+                        <div className="flex items-center justify-center font-mono text-sm text-muted-foreground w-full h-full">
+                          {isPlayingThis ? (
+                            <div className="flex items-end gap-[2px] h-3.5">
+                              <span className="w-1 bg-primary animate-music-bar-1 rounded-t-sm" />
+                              <span className="w-1 bg-primary animate-music-bar-2 rounded-t-sm" />
+                              <span className="w-1 bg-primary animate-music-bar-3 rounded-t-sm" />
+                            </div>
+                          ) : (
+                            <>
+                              <span
+                                className={cn(
+                                  "group-hover:hidden",
+                                  isTrackActive && "text-primary font-bold"
+                                )}
+                              >
+                                {index + 1}
+                              </span>
+                              <Play className="hidden group-hover:block size-4 fill-foreground text-foreground ml-1" />
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Info */}
+                      <TableCell className="max-w-[200px] sm:max-w-none">
+                        <div className="flex items-center gap-3">
+                          <div className="relative shrink-0">
+                            <img
+                              src={track.coverImage}
+                              className="size-10 rounded-md object-cover shadow-sm border border-border/10"
+                              alt=""
+                            />
+                            {/* Optional: Playing Overlay */}
+                            {isPlayingThis && (
+                              <div className="absolute inset-0 bg-black/40 rounded-md flex items-center justify-center">
+                                <Music2 className="size-5 text-white animate-pulse" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span
+                              className={cn(
+                                "font-bold truncate text-sm sm:text-base transition-colors",
+                                isTrackActive
+                                  ? "text-primary"
+                                  : "text-foreground group-hover:text-primary"
+                              )}
+                            >
+                              {track.title}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate font-medium group-hover:text-foreground/80 transition-colors">
+                              {track.artist?.name}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      {/* Album */}
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground font-medium hover:text-foreground hover:underline cursor-pointer transition-colors max-w-[200px] truncate">
+                        {track.album?.title || "Single"}
+                      </TableCell>
+
+                      {/* Date */}
+                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground/60 font-mono">
+                        {dayjs(playlist.createdAt).format("DD/MM/YYYY")}
+                      </TableCell>
+
+                      {/* Duration */}
+                      <TableCell className="text-right text-xs font-mono text-muted-foreground group-hover:text-foreground">
+                        {formatDuration(track.duration)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                /* --- TRƯỜNG HỢP 2: PLAYLIST RỖNG --- */
+                <TableRow className="hover:bg-transparent border-none">
+                  <TableCell colSpan={5} className="h-[400px] p-0">
+                    <EmptyPlaylistState
+                      isOwner={isOwner}
+                      onAdd={() => setIsManageTracksOpen(true)}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Footer Metadata */}
+          {playlist.tracks?.length > 0 && (
+            <footer className="mt-16 py-12 border-t border-border/40 flex flex-col gap-2 items-center text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                <Calendar className="size-3.5" /> Created{" "}
+                {dayjs(playlist.createdAt).format("MMM D, YYYY")}
+              </div>
+              <p className="text-[10px] opacity-60">
+                © {new Date().getFullYear()} Studio Music Platform.
+              </p>
+            </footer>
           )}
-        </motion.div>
-      </section>
+        </section>
+      </div>
+
+      {/* --- MODAL SYSTEM --- */}
+      <PlaylistModal
+        isOpen={isEditMetaOpen}
+        onClose={() => setIsEditMetaOpen(false)}
+        playlist={playlist}
+      />
+      <EditPlaylistTracksModal
+        isOpen={isManageTracksOpen}
+        onClose={() => setIsManageTracksOpen(false)}
+        playlistId={playlist?._id}
+      />
+      <ConfirmationModal
+        isOpen={isDeleteOpen}
+        onCancel={() => setIsDeleteOpen(false)}
+        onConfirm={() => {
+          // Logic delete API
+        }}
+        title="Xóa Playlist vĩnh viễn?"
+        description={`"${playlist?.title}" sẽ bị gỡ bỏ khỏi thư viện của bạn. Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa ngay"
+        isDestructive
+      />
     </div>
   );
-}
+};
+
+// --- SUB-COMPONENTS (Tách ra và Style chuẩn) ---
+
+const TooltipAction = ({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) => (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="secondary" // Dùng secondary thay vì custom class cứng
+          size="icon"
+          className="rounded-full size-11 bg-background/50 hover:bg-background border border-border/50 transition-all"
+          onClick={onClick}
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="font-bold text-[10px] uppercase tracking-widest bg-popover text-popover-foreground border-border shadow-lg">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
+
+// --- COMPONENT: EMPTY STATE (Đẹp hơn, chuẩn theme) ---
+const EmptyPlaylistState = ({
+  isOwner,
+  onAdd,
+}: {
+  isOwner: boolean;
+  onAdd: () => void;
+}) => (
+  <div className="flex flex-col items-center justify-center h-full gap-6 animate-in slide-in-from-bottom-4 duration-500">
+    <div className="relative group">
+      {/* Glow Effect */}
+      <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full group-hover:bg-primary/30 transition-all" />
+      <div className="relative size-24 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center shadow-inner">
+        <Disc3 className="size-10 text-muted-foreground/50 group-hover:text-primary transition-colors duration-500 animate-slow-spin" />
+      </div>
+    </div>
+
+    <div className="space-y-2 text-center max-w-sm">
+      <h3 className="text-xl font-bold tracking-tight text-foreground">
+        Playlist này còn trống
+      </h3>
+      <p className="text-sm text-muted-foreground">
+        {isOwner
+          ? "Hãy bắt đầu thêm những bài hát yêu thích để tạo nên giai điệu của riêng bạn."
+          : "Người tạo chưa thêm bài hát nào vào playlist này."}
+      </p>
+    </div>
+
+    {isOwner && (
+      <Button
+        onClick={onAdd}
+        size="lg"
+        className="rounded-full px-8 font-bold uppercase text-xs tracking-widest shadow-lg shadow-primary/20"
+      >
+        <PlusCircle className="size-4 mr-2" />
+        Thêm bài hát ngay
+      </Button>
+    )}
+  </div>
+);
+
+// --- COMPONENT: NOT FOUND / ERROR (Toàn màn hình) ---
+const PlaylistNotFound = ({ onBack }: { onBack: () => void }) => (
+  <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 text-center px-6 animate-in zoom-in-95 duration-300">
+    <div className="size-24 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
+      <SearchX className="size-12 text-destructive opacity-80" />
+    </div>
+    <div className="space-y-2">
+      <h2 className="text-3xl font-black tracking-tight text-foreground">
+        Không tìm thấy Playlist
+      </h2>
+      <p className="text-muted-foreground max-w-[300px] mx-auto">
+        Playlist bạn đang tìm kiếm có thể đã bị xóa, chuyển sang chế độ riêng tư
+        hoặc đường dẫn không chính xác.
+      </p>
+    </div>
+    <Button
+      onClick={onBack}
+      variant="outline"
+      className="rounded-full px-8 h-11 font-bold uppercase text-[11px] tracking-widest border-border hover:bg-accent"
+    >
+      Quay lại trang chủ
+    </Button>
+  </div>
+);
+
 export default PlaylistDetailPage;

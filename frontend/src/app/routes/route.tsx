@@ -7,10 +7,11 @@ import { ClientLayout, RootLayout } from "@/layouts";
 import AdminLayout from "@/layouts/admin/AdminLayout";
 import ProtectedRoute from "@/app/routes/ProtectedRoute";
 import {
-  AlbumPage,
+  AlbumManagementPage,
   AnalyticPage,
-  ArtistPage,
+  ArtistManagementPage,
   BrowsePage,
+  ClaimProfilePage,
   DashboardPage,
   GenrePage,
   HomePage,
@@ -25,6 +26,7 @@ import {
 import { GuestRoute } from "@/app/routes/GuestRoute";
 import { guestAuthRoutes, protectedAuthRoutes } from "@/features/auth/routes";
 import { ADMIN_PATHS, CLIENT_PATHS } from "@/config/paths";
+import PlaylistManagementPage from "@/pages/admin/PlaylistManagementPage";
 
 export const router = createBrowserRouter([
   {
@@ -62,6 +64,10 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute />,
             children: [
               { path: CLIENT_PATHS.PROFILE, element: <ProfilePage /> },
+              {
+                path: CLIENT_PATHS.CLAIM_PROFILE,
+                element: <ClaimProfilePage />,
+              },
               { path: CLIENT_PATHS.SETTINGS, element: <SettingsPage /> },
               ...protectedAuthRoutes,
             ],
@@ -90,11 +96,11 @@ export const router = createBrowserRouter([
               },
               {
                 path: ADMIN_PATHS.ARTISTS,
-                element: <ArtistPage />,
+                element: <ArtistManagementPage />,
               },
               {
                 path: ADMIN_PATHS.ALBUMS,
-                element: <AlbumPage />,
+                element: <AlbumManagementPage />,
               },
               {
                 path: ADMIN_PATHS.ANALYTICS,
@@ -107,6 +113,10 @@ export const router = createBrowserRouter([
               {
                 path: ADMIN_PATHS.SETTINGS,
                 element: <SettingPage />,
+              },
+              {
+                path: ADMIN_PATHS.PLAYLISTS,
+                element: <PlaylistManagementPage />,
               },
             ],
           },

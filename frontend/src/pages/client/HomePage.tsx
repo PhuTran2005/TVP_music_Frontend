@@ -1,6 +1,7 @@
 import { Hero } from "../../components/Hero";
 import { FeaturedAlbums } from "../../components/FeaturedAlbums";
 import { ArtistSpotlight } from "../../components/ArtistSpotlight";
+import { RealtimeChart } from "@/components/TopTrackChart";
 
 export function HomePage() {
   return (
@@ -8,6 +9,7 @@ export function HomePage() {
       <Hero />
       <FeaturedAlbums />
       <ArtistSpotlight />
+      <RealtimeChart />
     </>
   );
 }
