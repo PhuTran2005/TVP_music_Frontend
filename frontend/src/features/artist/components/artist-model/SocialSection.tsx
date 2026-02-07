@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { ArtistFormValues } from "@/features/artist/schemas/artist.schema";
+import { cn } from "@/lib/utils";
 
 interface SocialSectionProps {
   form: UseFormReturn<ArtistFormValues>;
@@ -27,60 +28,81 @@ const SocialSection: React.FC<SocialSectionProps> = ({ form }) => {
       name: "facebook",
       icon: <Facebook className="size-4 text-[#1877F2]" />,
       placeholder: "facebook.com/...",
+      label: "Facebook",
     },
     {
       name: "instagram",
       icon: <Instagram className="size-4 text-[#E4405F]" />,
       placeholder: "instagram.com/...",
+      label: "Instagram",
     },
     {
       name: "twitter",
       icon: <Twitter className="size-4 text-[#1DA1F2]" />,
       placeholder: "twitter.com/...",
+      label: "Twitter (X)",
     },
     {
       name: "spotify",
       icon: <Music2 className="size-4 text-[#1DB954]" />,
       placeholder: "open.spotify.com/artist/...",
+      label: "Spotify",
     },
     {
       name: "youtube",
       icon: <Youtube className="size-4 text-[#FF0000]" />,
-      placeholder: "youtube.com/c/...",
+      placeholder: "youtube.com/channel/...",
+      label: "YouTube",
     },
     {
       name: "website",
-      icon: <Globe className="size-4 text-muted-foreground" />,
-      placeholder: "https://artist-website.com",
+      icon: <Globe className="size-4 text-foreground/70" />,
+      placeholder: "https://your-website.com",
+      label: "Website",
     },
   ];
 
   return (
-    <div className="space-y-4 p-6 bg-muted/20 rounded-2xl border border-border/50">
-      <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+    <div className="h-full flex flex-col">
+      {/* Header Section */}
+      <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
         <Link2 className="size-4 text-primary" />
         <h4 className="text-xs font-bold text-foreground uppercase tracking-widest">
           Liên kết Mạng xã hội
         </h4>
       </div>
 
-      <div className="grid gap-3">
+      {/* Grid Inputs */}
+      <div className="grid gap-4">
         {socialFields.map((field) => (
-          <div key={field.name} className="space-y-1">
+          <div key={field.name} className="space-y-1.5">
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 transition-transform group-focus-within:scale-110">
+              {/* Icon Container */}
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center size-5 transition-transform group-focus-within:scale-110">
                 {field.icon}
               </div>
+
+              {/* Input Field */}
               <Input
                 {...register(`socialLinks.${field.name}` as any)}
                 placeholder={field.placeholder}
-                className="pl-10 h-9 text-xs bg-background/50 focus:bg-background transition-all"
+                className={cn(
+                  "pl-10 h-10 text-sm bg-background border-input shadow-sm transition-all",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20",
+                  "placeholder:text-muted-foreground/60",
+                  errors.socialLinks?.[
+                    field.name as keyof typeof errors.socialLinks
+                  ] &&
+                    "border-destructive focus-visible:ring-destructive/20 bg-destructive/5"
+                )}
               />
             </div>
+
+            {/* Error Message */}
             {errors.socialLinks?.[
               field.name as keyof typeof errors.socialLinks
             ] && (
-              <p className="text-[10px] text-destructive ml-1">
+              <p className="text-[11px] font-bold text-destructive ml-1 animate-in slide-in-from-left-1">
                 {
                   errors.socialLinks[
                     field.name as keyof typeof errors.socialLinks

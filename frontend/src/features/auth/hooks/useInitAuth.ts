@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { useAppDispatch } from "@/store/store"; // Nhớ import từ store hooks
 import { initAuth } from "@/features/auth/slice/authSlice"; // Import Thunk đã viết
+import { useAppDispatch } from "@/store/hooks";
 
 export const useInitAuth = () => {
   const dispatch = useAppDispatch();

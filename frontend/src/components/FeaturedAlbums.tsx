@@ -1,81 +1,75 @@
-import React from "react";
+import { Disc3 } from "lucide-react";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import PublicAlbumCard from "@/features/album/components/PublicAlbumCard"; // Import component vừa tạo
+
 import { Skeleton } from "@/components/ui/skeleton";
-import { Album } from "@/features/album/types";
+import PublicAlbumCard from "@/features/album/components/PublicAlbumCard";
 import { useFeatureAlbum } from "@/features/album/hooks/useClientAlbum";
+import { Album } from "@/features/album/types";
+import { SectionHeader } from "@/pages/client/home/SectionHeader";
+import { HorizontalScroll } from "@/pages/client/home/HorizontalScroll";
 
 export function FeaturedAlbums() {
-  // 1. Gọi API lấy dữ liệu thật
   const { data: albums, isLoading } = useFeatureAlbum(6);
 
   return (
-    <section className="py-16 lg:py-24 px-4 lg:px-6">
-      <div className="container">
-        {/* HEADER */}
-        <motion.div
-          className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-12 gap-4"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          <div>
-            <h2 className="text-3xl lg:text-4xl font-black mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent tracking-tighter">
-              Featured Albums
-            </h2>
-            <p className="text-muted-foreground text-base lg:text-lg max-w-2xl">
-              Khám phá những album mới nhất và thịnh hành từ các nghệ sĩ yêu
-              thích của bạn.
-            </p>
-          </div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              variant="outline"
-              className="group rounded-full px-6 h-10 border-primary/20 text-primary hover:bg-primary/5"
-            >
-              View All
-              <motion.span
-                className="ml-2 inline-block"
-                animate={{ x: 0 }}
-                whileHover={{ x: 5 }}
-                transition={{ duration: 0.2 }}
-              >
-                →
-              </motion.span>
-            </Button>
-          </motion.div>
-        </motion.div>
+    <section className="py-16 lg:py-24 bg-background border-b border-border/40 relative">
+      <div className="container mx-auto px-4 sm:px-6">
+        <div className="mb-8 md:mb-12">
+          <SectionHeader
+            icon={<Disc3 className="w-4 h-4" />}
+            label="Selection"
+            title="Featured Albums"
+            description="Album nổi bật được biên tập chọn lọc."
+            viewAllHref="/albums"
+          />
+        </div>
 
-        {/* GRID CONTENT */}
         {isLoading ? (
-          // Skeleton Loading
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="aspect-square rounded-2xl w-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <SkeletonGrid count={6} />
         ) : (
-          // Real Data
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-x-6 gap-y-10">
-            {albums?.map((album: Album) => (
-              <PublicAlbumCard
-                key={album._id}
-                album={album}
-                // Tùy chỉnh class nếu cần
-                className="w-full"
-              />
-            ))}
+          <div className="relative">
+            {/* Mobile Scroll */}
+            <div className="lg:hidden -mx-4 px-4">
+              <HorizontalScroll>
+                {albums?.map((album: Album) => (
+                  <div
+                    key={album._id}
+                    className="snap-start shrink-0 w-[260px] sm:w-[300px] first:pl-0 last:pr-4"
+                  >
+                    <PublicAlbumCard album={album} />
+                  </div>
+                ))}
+              </HorizontalScroll>
+            </div>
+
+            {/* Desktop Grid */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5 }}
+              className="hidden lg:grid grid-cols-5 xl:grid-cols-6 gap-6 xl:gap-8"
+            >
+              {albums?.map((album: Album) => (
+                <PublicAlbumCard key={album._id} album={album} />
+              ))}
+            </motion.div>
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function SkeletonGrid({ count }: { count: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6 xl:gap-8">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="space-y-3">
+          <Skeleton className="aspect-square rounded-2xl" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      ))}
+    </div>
   );
 }

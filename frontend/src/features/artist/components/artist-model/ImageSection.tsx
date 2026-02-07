@@ -47,21 +47,22 @@ const ImageSection: React.FC<ImageSectionProps> = ({ form, initialData }) => {
   };
 
   return (
-    <div className="relative mb-16">
+    <div className="relative mb-20">
       {/* --- COVER IMAGE --- */}
-      <div className="group relative w-full h-48 md:h-64 bg-muted overflow-hidden">
+      <div className="group relative w-full h-48 md:h-64 bg-secondary/30 border-b border-border overflow-hidden">
         {coverPreview ? (
           <>
             <img
               src={coverPreview}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               alt="cover"
             />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            {/* Dark Overlay on Hover */}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px]">
               <Button
                 variant="secondary"
                 size="sm"
-                className="relative cursor-pointer"
+                className="relative cursor-pointer font-semibold shadow-md"
               >
                 <Camera className="w-4 h-4 mr-2" /> Change Cover
                 <input
@@ -74,7 +75,7 @@ const ImageSection: React.FC<ImageSectionProps> = ({ form, initialData }) => {
               <Button
                 variant="destructive"
                 size="icon"
-                className="h-9 w-9"
+                className="shadow-md"
                 onClick={(e) => handleRemove(e, "coverImage")}
               >
                 <Trash2 className="w-4 h-4" />
@@ -82,10 +83,15 @@ const ImageSection: React.FC<ImageSectionProps> = ({ form, initialData }) => {
             </div>
           </>
         ) : (
-          <label className="flex flex-col items-center justify-center w-full h-full border-b-2 border-dashed border-border hover:bg-primary/5 transition-colors cursor-pointer">
-            <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Upload Cover Image (1920x600)
+          <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer bg-secondary/10">
+            <div className="p-4 rounded-full bg-background shadow-sm mb-3 text-muted-foreground group-hover:text-primary transition-colors">
+              <ImageIcon className="w-8 h-8" />
+            </div>
+            <span className="text-sm font-bold text-foreground/70 uppercase tracking-wide">
+              Upload Cover Image
+            </span>
+            <span className="text-[10px] text-muted-foreground mt-1">
+              Recommended: 1920x600 px
             </span>
             <input
               type="file"
@@ -96,26 +102,29 @@ const ImageSection: React.FC<ImageSectionProps> = ({ form, initialData }) => {
           </label>
         )}
 
-        {/* Theme Color Picker Overlay */}
-        <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-background/80 backdrop-blur-md p-1.5 rounded-full border shadow-lg transition-transform hover:scale-105">
-          <div
-            className="size-6 rounded-full border shadow-inner"
-            style={{ backgroundColor: form.watch("themeColor") || "#7c3aed" }}
-          />
-          <input
-            type="color"
-            {...form.register("themeColor")}
-            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-          />
-          <span className="text-[10px] font-bold uppercase pr-2 text-foreground">
-            Theme
-          </span>
+        {/* Theme Color Picker - Rõ ràng hơn */}
+        <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-background p-1.5 pr-3 rounded-full border border-border shadow-lg z-20 hover:scale-105 transition-transform">
+          <div className="relative size-7 rounded-full overflow-hidden border border-border shadow-sm">
+            <input
+              type="color"
+              {...form.register("themeColor")}
+              className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] cursor-pointer p-0 m-0"
+            />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase leading-none text-foreground">
+              Theme
+            </span>
+            <span className="text-[9px] text-muted-foreground leading-none">
+              Color
+            </span>
+          </div>
         </div>
       </div>
 
       {/* --- AVATAR IMAGE --- */}
-      <div className="absolute -bottom-12 left-6 md:left-10">
-        <div className="group/avatar relative size-32 md:size-36 rounded-full border-[6px] border-card bg-muted shadow-xl overflow-hidden">
+      <div className="absolute -bottom-14 left-6 md:left-10 z-10">
+        <div className="group/avatar relative size-32 md:size-36 rounded-full border-[5px] border-card bg-background shadow-xl overflow-hidden ring-1 ring-black/5">
           {avatarPreview ? (
             <>
               <img
@@ -123,12 +132,8 @@ const ImageSection: React.FC<ImageSectionProps> = ({ form, initialData }) => {
                 className="w-full h-full object-cover"
                 alt="avatar"
               />
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-all flex flex-col items-center justify-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-white relative cursor-pointer hover:bg-white/20"
-                >
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-[1px]">
+                <div className="relative p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors cursor-pointer text-white">
                   <Camera className="w-5 h-5" />
                   <input
                     type="file"
@@ -136,20 +141,20 @@ const ImageSection: React.FC<ImageSectionProps> = ({ form, initialData }) => {
                     accept="image/*"
                     onChange={(e) => handleFile(e, "avatar")}
                   />
-                </Button>
+                </div>
                 <button
                   type="button"
                   onClick={(e) => handleRemove(e, "avatar")}
-                  className="text-white/70 hover:text-red-400 transition-colors"
+                  className="p-2 text-white/70 hover:text-red-400 transition-colors"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-5 h-5" />
                 </button>
               </div>
             </>
           ) : (
-            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer hover:bg-primary/5 transition-colors">
-              <User className="w-10 h-10 text-muted-foreground" />
-              <span className="text-[10px] font-bold uppercase mt-1">
+            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer hover:bg-secondary transition-colors bg-muted/30">
+              <User className="w-10 h-10 text-muted-foreground mb-1" />
+              <span className="text-[9px] font-bold uppercase text-foreground/60">
                 Avatar
               </span>
               <input

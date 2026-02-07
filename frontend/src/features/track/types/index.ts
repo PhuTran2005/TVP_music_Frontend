@@ -1,3 +1,6 @@
+import { Album } from "@/features/album/types";
+import { Artist } from "@/features/artist/types";
+
 export interface Track {
   _id: string;
   title: string;
@@ -5,9 +8,9 @@ export interface Track {
   description?: string;
 
   // Populated Data
-  artist: { _id: string; name: string; avatar: string };
-  featuringArtists: Array<{ _id: string; name: string }>;
-  album?: { _id: string; title: string; coverImage: string } | null;
+  artist: Artist;
+  featuringArtists: Artist[];
+  album?: Album | null;
   genres: Array<{ _id: string; name: string }>;
   uploader: string;
 
@@ -39,18 +42,57 @@ export interface Track {
   likeCount: number;
   status: "pending" | "processing" | "ready" | "failed";
   isPublic: boolean;
-
+  errorReason?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface TrackFilterParams {
-  page: number;
-  limit: number;
+  page?: number;
+  limit?: number;
   keyword?: string;
   artistId?: string;
   albumId?: string;
   genreId?: string;
   status?: "pending" | "processing" | "ready" | "failed";
   sort?: "newest" | "popular" | "alphabetical";
+}
+
+// 1. Dữ liệu 1 điểm trên biểu đồ (Time Series)
+export interface ChartDataPoint {
+  time: string;
+  top1: number;
+  top2: number;
+  top3: number;
+}
+
+// 2. Cấu trúc bài hát trong BXH
+export interface ChartTrack {
+  _id: string;
+  title: string;
+  slug: string;
+  coverImage: string;
+  fileUrl: string;
+  artist: Artist;
+  score: number;
+  album?: Album;
+  featuringArtists: Artist[];
+  duration: number;
+
+  // Frontend only
+  rank?: number;
+  lastRank?: number;
+}
+
+// 3. Cấu trúc Data trả về từ API / Socket (Bao gồm cả List và Chart)
+export interface RealtimeChartData {
+  items: ChartTrack[]; // Danh sách 100 bài
+  chart: ChartDataPoint[]; // Dữ liệu biểu đồ cho Top 3
+}
+
+// 4. Response bọc ngoài cùng
+export interface ChartResponse {
+  success: boolean;
+  data: RealtimeChartData; // 🔥 Sửa lại chỗ này: Không phải ChartTrack[] nữa
+  timestamp?: string;
 }

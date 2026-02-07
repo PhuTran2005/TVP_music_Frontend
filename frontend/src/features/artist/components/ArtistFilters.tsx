@@ -8,6 +8,7 @@ import {
   Globe,
   Music2,
   LayoutGrid,
+  Filter,
 } from "lucide-react";
 import { ArtistFilterParams } from "@/features/artist/types";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import FilterDropdown from "@/components/ui/FilterDropdown";
 import { GenreSelector } from "@/features/genre/components/GenreSelector";
 import { NationalitySelector } from "@/components/ui/NationalitySelector";
+import { cn } from "@/lib/utils";
 
 // Shadcn Select
 import {
@@ -93,23 +95,23 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
   }, [params]);
 
   return (
-    <div className="w-full bg-card border rounded-xl shadow-sm mb-6 animate-in fade-in duration-500">
+    <div className="w-full bg-card border border-border rounded-xl shadow-sm mb-8 transition-all hover:border-primary/20">
       <div className="p-4 space-y-4">
         {/* --- TOP ROW: Search & Actions --- */}
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
           {/* Search Bar */}
           <div className="relative w-full max-w-md group">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Tìm kiếm nghệ sĩ, nghệ danh..."
-              className="pl-9 bg-background h-9 text-sm focus-visible:ring-1 transition-all"
+              className="pl-9 bg-background h-10 text-sm border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium placeholder:font-normal"
             />
             {localSearch && (
               <button
                 onClick={() => setLocalSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-all"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -117,15 +119,15 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
           </div>
 
           {/* Right Actions Group */}
-          <div className="flex items-center gap-2 self-end md:self-auto w-full md:w-auto justify-end">
+          <div className="flex items-center gap-3 self-end md:self-auto w-full md:w-auto justify-end">
             {/* Sort Dropdown */}
             <Select
               value={params.sort || "newest"}
               onValueChange={(val) => handleChange("sort", val)}
             >
-              <SelectTrigger className="w-[150px] h-9 text-xs bg-background">
+              <SelectTrigger className="w-[160px] h-10 text-sm bg-background border-input shadow-sm font-medium">
                 <div className="flex items-center gap-2">
-                  <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                  <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
                   <SelectValue placeholder="Sắp xếp" />
                 </div>
               </SelectTrigger>
@@ -138,27 +140,29 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
               </SelectContent>
             </Select>
 
-            <div className="h-4 w-px bg-border mx-1 hidden md:block" />
+            <div className="h-6 w-px bg-border hidden md:block" />
 
             <Button
               variant={showFilters ? "secondary" : "outline"}
-              size="sm"
               onClick={() => setShowFilters(!showFilters)}
-              className="gap-2 h-9"
+              className={cn(
+                "gap-2 h-10 px-4 font-bold border-input shadow-sm transition-all",
+                showFilters &&
+                  "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+              )}
             >
-              <LayoutGrid className="w-4 h-4" />
+              <Filter className="w-4 h-4" />
               Bộ lọc
             </Button>
 
             {hasFilter && (
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={handleReset}
-                className="text-destructive hover:bg-destructive/10 h-9 px-2 gap-1.5 animate-in zoom-in"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive h-10 px-3 gap-2 font-bold animate-in zoom-in duration-200"
               >
-                <RotateCcw className="size-3.5" />
-                <span className="hidden sm:inline">Xóa lọc</span>
+                <RotateCcw className="size-4" />
+                Xóa
               </Button>
             )}
           </div>
@@ -166,7 +170,7 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
 
         {/* --- BOTTOM ROW: Expanded Filters --- */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border animate-in slide-in-from-top-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border animate-in slide-in-from-top-2 duration-300">
             {/* 1. Nationality Filter */}
             <FilterDropdown
               isActive={!!params.nationality}
@@ -174,10 +178,10 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
               label={
                 <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-blue-500" />
-                  <span className="truncate text-xs">
+                  <span className="truncate text-sm font-medium">
                     {params.nationality
                       ? `Quốc gia: ${params.nationality}`
-                      : "Chọn quốc gia"}
+                      : "Quốc gia"}
                   </span>
                 </div>
               }
@@ -199,8 +203,8 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
               label={
                 <div className="flex items-center gap-2">
                   <Music2 className="w-4 h-4 text-primary" />
-                  <span className="truncate text-xs">
-                    {params.genreId ? "Genre đã chọn" : "Chọn thể loại"}
+                  <span className="truncate text-sm font-medium">
+                    {params.genreId ? "Genre đã chọn" : "Thể loại nhạc"}
                   </span>
                 </div>
               }
@@ -225,10 +229,10 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
                 handleChange("isActive", value);
               }}
             >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <LayoutGrid className="w-4 h-4" />
-                  <span className="text-foreground truncate">
+              <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
+                <div className="flex items-center gap-2 text-sm">
+                  <LayoutGrid className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-foreground truncate font-medium">
                     {params.isActive === undefined
                       ? "Trạng thái: Tất cả"
                       : params.isActive
@@ -256,10 +260,10 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
                 handleChange("isVerified", value);
               }}
             >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <ShieldCheck className="w-4 h-4 text-blue-500" />
-                  <span className="text-foreground truncate">
+              <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
+                <div className="flex items-center gap-2 text-sm">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  <span className="text-foreground truncate font-medium">
                     {params.isVerified === undefined
                       ? "Xác minh: Tất cả"
                       : "Nghệ sĩ xác minh"}

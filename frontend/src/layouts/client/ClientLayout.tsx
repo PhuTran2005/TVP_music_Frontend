@@ -5,36 +5,28 @@ import { cn } from "@/lib/utils";
 import { Outlet } from "react-router-dom";
 
 const ClientLayout = () => {
-  // 1. Gọi hook lấy padding (Ví dụ player cao 90px + khoảng cách an toàn)
-  // Lưu ý: Class trả về thường là 'pb-[150px]'
+  // Hook tính toán khoảng cách an toàn cho Player bar
   const playerPaddingClass = usePlayerPadding(120);
 
   return (
     <div
       className={cn(
-        // --- LAYOUT CHUẨN ---
-        "relative flex min-h-screen flex-col",
-
-        // --- THEME COLORS (Chuẩn index.css) ---
-        "bg-background text-foreground font-sans antialiased",
-
-        // --- PLAYER PADDING ---
-        // Áp dụng padding-bottom cho container tổng để Footer không bị Player che
+        "relative flex min-h-screen flex-col bg-background font-sans antialiased text-foreground",
+        // Thêm transition mượt mà khi đổi theme
+        "transition-colors duration-300",
         playerPaddingClass
       )}
     >
       <Header />
 
-      {/* flex-1: Đẩy Footer xuống đáy nếu nội dung ngắn.
-        w-full: Đảm bảo content không bị co lại.
-      */}
-      <main className="flex-1 w-full">
+      {/* Main Content Area */}
+      <main className="flex-1 w-full relative z-0">
         <Outlet />
       </main>
 
       <Footer />
 
-      {/* Player thường nằm ở đây hoặc render qua Portal */}
+      {/* Player thường được render ở root hoặc portal, nhưng layout cần chừa chỗ */}
     </div>
   );
 };

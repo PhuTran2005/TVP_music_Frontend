@@ -2,20 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
   X,
-  ListFilter,
   RotateCcw,
-  Check,
   ArrowUpDown,
   TrendingUp,
   FolderTree,
-  LayoutGrid,
   Eye,
+  Filter,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Shadcn Select
 import {
   Select,
   SelectContent,
@@ -33,7 +30,7 @@ interface GenreFiltersProps {
 const SORT_OPTIONS = [
   { label: "Mặc định (Priority)", value: "priority" },
   { label: "Phổ biến nhất", value: "popular" },
-  { label: "Tên A-Z", value: "a-z" },
+  { label: "Tên A-Z", value: "name" },
   { label: "Mới nhất", value: "newest" },
 ] as const;
 
@@ -42,8 +39,6 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
   setParams,
 }) => {
   const [showFilters, setShowFilters] = useState(false);
-
-  // --- 1. Debounce Search Logic ---
   const [localSearch, setLocalSearch] = useState(params.keyword || "");
 
   useEffect(() => {
@@ -55,7 +50,6 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
     return () => clearTimeout(timer);
   }, [localSearch, params.keyword, setParams]);
 
-  // Helper change params
   const handleChange = useCallback(
     (key: keyof GenreFilterParams, value: any) => {
       setParams((prev) => ({ ...prev, [key]: value, page: 1 }));
@@ -63,7 +57,6 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
     [setParams]
   );
 
-  // --- 2. Reset Logic ---
   const handleReset = () => {
     setLocalSearch("");
     setParams((prev) => ({
@@ -78,7 +71,6 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
     }));
   };
 
-  // Check xem có đang filter không
   const hasFilter = useMemo(() => {
     return !!(
       params.keyword ||
@@ -90,23 +82,23 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
   }, [params]);
 
   return (
-    <div className="w-full bg-card border rounded-xl shadow-sm mb-6 animate-in fade-in duration-500">
+    <div className="w-full bg-card border border-border rounded-xl shadow-sm mb-6">
       <div className="p-4 space-y-4">
-        {/* --- TOP ROW: Search & Main Actions --- */}
+        {/* --- TOP ROW --- */}
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-          {/* Search Bar */}
+          {/* Search Bar - Viền rõ ràng */}
           <div className="relative w-full max-w-md group">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Tìm kiếm thể loại..."
-              className="pl-9 bg-background h-9 text-sm focus-visible:ring-1 transition-all"
+              className="pl-9 bg-background h-10 text-sm border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium placeholder:font-normal"
             />
             {localSearch && (
               <button
                 onClick={() => setLocalSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-all"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -114,48 +106,54 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
           </div>
 
           {/* Right Actions Group */}
-          <div className="flex items-center gap-2 self-end md:self-auto w-full md:w-auto justify-end">
+          <div className="flex items-center gap-3 self-end md:self-auto w-full md:w-auto justify-end">
             {/* Sort Dropdown */}
             <Select
               value={params.sort || "priority"}
               onValueChange={(val) => handleChange("sort", val)}
             >
-              <SelectTrigger className="w-[160px] h-9 text-xs bg-background">
+              <SelectTrigger className="w-[180px] h-10 text-sm bg-background border-input shadow-sm font-medium">
                 <div className="flex items-center gap-2">
-                  <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+                  <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
                   <SelectValue placeholder="Sắp xếp" />
                 </div>
               </SelectTrigger>
               <SelectContent>
                 {SORT_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    className="font-medium"
+                  >
                     {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <div className="h-4 w-px bg-border mx-1 hidden md:block" />
+            <div className="h-6 w-px bg-border hidden md:block" />
 
             <Button
               variant={showFilters ? "secondary" : "outline"}
-              size="sm"
               onClick={() => setShowFilters(!showFilters)}
-              className="gap-2 h-9"
+              className={cn(
+                "gap-2 h-10 px-4 font-bold border-input shadow-sm transition-all",
+                showFilters &&
+                  "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+              )}
             >
-              <LayoutGrid className="w-4 h-4" />
+              <Filter className="w-4 h-4" />
               Bộ lọc
             </Button>
 
             {hasFilter && (
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={handleReset}
-                className="text-destructive hover:bg-destructive/10 h-9 px-2 gap-1.5 animate-in zoom-in"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive h-10 px-3 gap-2 font-bold animate-in zoom-in duration-200"
               >
-                <RotateCcw className="size-3.5" />
-                <span className="hidden sm:inline">Xóa lọc</span>
+                <RotateCcw className="size-4" />
+                Xóa
               </Button>
             )}
           </div>
@@ -163,47 +161,55 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
 
         {/* --- BOTTOM ROW: Expanded Filters --- */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border animate-in slide-in-from-top-2">
-            {/* 1. Trạng thái (Status) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border animate-in slide-in-from-top-2 duration-300">
+            {/* 1. Trạng thái */}
             <Select
               value={params.status || "all"}
               onValueChange={(val) =>
                 handleChange("status", val === "all" ? undefined : val)
               }
             >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Eye className="w-4 h-4" />
-                  <span className="text-foreground truncate uppercase text-[11px] font-bold">
-                    {params.status
-                      ? `Trạng thái: ${params.status}`
-                      : "Trạng thái: Tất cả"}
+              <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1 bg-muted rounded">
+                    <Eye className="w-3.5 h-3.5 text-foreground/70" />
+                  </div>
+                  <span className="text-xs font-bold uppercase text-muted-foreground tracking-wide mr-1">
+                    Trạng thái:
+                  </span>
+                  <span className="text-sm font-semibold text-foreground truncate">
+                    {params.status === "active"
+                      ? "Đang hoạt động"
+                      : params.status === "inactive"
+                      ? "Tạm ẩn"
+                      : "Tất cả"}
                   </span>
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="active">Đang hoạt động</SelectItem>
                 <SelectItem value="inactive">Tạm ẩn</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* 2. Cấp bậc (Hierarchy) */}
+            {/* 2. Cấp bậc */}
             <Select
               value={params.parentId || "all"}
               onValueChange={(val) =>
                 handleChange("parentId", val === "all" ? undefined : val)
               }
             >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <FolderTree className="w-4 h-4" />
-                  <span className="text-foreground truncate uppercase text-[11px] font-bold">
-                    {params.parentId === "root"
-                      ? "Cấp bậc: Gốc (Root)"
-                      : params.parentId
-                      ? "Cấp bậc: Thể loại con"
-                      : "Cấp bậc: Tất cả"}
+              <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1 bg-muted rounded">
+                    <FolderTree className="w-3.5 h-3.5 text-foreground/70" />
+                  </div>
+                  <span className="text-xs font-bold uppercase text-muted-foreground tracking-wide mr-1">
+                    Cấp bậc:
+                  </span>
+                  <span className="text-sm font-semibold text-foreground truncate">
+                    {params.parentId === "root" ? "Gốc (Root)" : "Tất cả"}
                   </span>
                 </div>
               </SelectTrigger>
@@ -213,7 +219,7 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
               </SelectContent>
             </Select>
 
-            {/* 3. Xu hướng (Trending) */}
+            {/* 3. Xu hướng */}
             <Select
               value={
                 params.isTrending === undefined
@@ -225,13 +231,16 @@ export const GenreFilters: React.FC<GenreFiltersProps> = ({
                 handleChange("isTrending", value);
               }}
             >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-foreground truncate uppercase text-[11px] font-bold">
-                    {params.isTrending === undefined
-                      ? "Xu hướng: Tất cả"
-                      : "Chỉ mục thịnh hành"}
+              <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1 bg-muted rounded">
+                    <TrendingUp className="w-3.5 h-3.5 text-foreground/70" />
+                  </div>
+                  <span className="text-xs font-bold uppercase text-muted-foreground tracking-wide mr-1">
+                    Xu hướng:
+                  </span>
+                  <span className="text-sm font-semibold text-foreground truncate">
+                    {params.isTrending === true ? "Đang thịnh hành" : "Tất cả"}
                   </span>
                 </div>
               </SelectTrigger>

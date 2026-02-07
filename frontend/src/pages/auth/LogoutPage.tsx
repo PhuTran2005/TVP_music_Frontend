@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppDispatch } from "@/store/store";
 
 import { toast } from "sonner"; // Hoặc notification của bạn
 import authApi from "@/features/auth/api/authApi";
 import { logout } from "@/features";
 import { VinylLoader } from "@/components/ui/MusicLoadingEffects";
+import { useAppDispatch } from "@/store/hooks";
 
 const LogoutPage = () => {
   const navigate = useNavigate();

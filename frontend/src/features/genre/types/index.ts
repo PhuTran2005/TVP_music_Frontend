@@ -8,11 +8,7 @@ export interface Genre {
   image?: string;
   color?: string; // Hex (#ff0000)
   gradient?: string; // CSS String ("linear-gradient(...)")
-  parentId?: {
-    name: string;
-    slug: string;
-    _id: string;
-  };
+  parentId?: Genre | null; // Thể loại cha
 
   // 🔥 New Curation Fields
   priority: number; // Độ ưu tiên sắp xếp
@@ -26,7 +22,10 @@ export interface Genre {
 
   createdAt: string;
 }
-
+export interface GenreDetail extends Genre {
+  subGenres: Genre[]; // List con
+  breadcrumbs: Array<{ _id: string; name: string; slug: string }>; // Đường dẫn cha
+}
 export interface GenreFilterParams {
   page: number;
   limit: number;

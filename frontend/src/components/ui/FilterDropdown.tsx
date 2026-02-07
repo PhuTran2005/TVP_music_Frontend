@@ -33,26 +33,35 @@ export const FilterDropdown = ({
         <Button
           variant="outline"
           className={cn(
-            "h-10 px-3 rounded-xl border-border/60 bg-background transition-all duration-200",
-            "hover:bg-accent hover:border-primary/30",
-            "data-[state=open]:border-primary/50 data-[state=open]:bg-accent",
-            isActive &&
-              "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 hover:border-primary/50",
+            // Base styles: Border rõ ràng (border-input), nền sạch, shadow nhẹ
+            "h-10 px-3.5 rounded-xl border-input bg-background shadow-sm transition-all duration-200",
+            "hover:bg-accent hover:text-accent-foreground hover:border-accent-foreground/30",
+            "data-[state=open]:border-primary data-[state=open]:ring-2 data-[state=open]:ring-primary/10",
+
+            // Active State: Tương phản cao hơn
+            isActive && [
+              "bg-primary/10 border-primary/30 text-primary", // Nền đậm hơn
+              "hover:bg-primary/20 hover:border-primary/50",
+              "font-semibold", // Chữ đậm hơn khi active
+            ],
             className
           )}
         >
-          <div className="flex items-center gap-2 max-w-[200px]">
+          <div className="flex items-center gap-2.5 max-w-[200px]">
+            {/* Label Text */}
             <span
               className={cn(
-                "truncate text-[13px] font-semibold tracking-tight transition-colors",
+                "truncate text-sm tracking-tight transition-colors",
+                // Logic màu chữ: Active -> Primary, Inactive -> Foreground (không dùng muted quá nhạt)
                 isActive
-                  ? "text-primary"
-                  : "text-muted-foreground group-hover:text-foreground"
+                  ? "text-primary font-bold"
+                  : "text-foreground font-medium"
               )}
             >
               {label}
             </span>
 
+            {/* Icons Area */}
             <div className="flex items-center shrink-0">
               {isActive && onClear ? (
                 <div
@@ -62,14 +71,17 @@ export const FilterDropdown = ({
                     e.stopPropagation();
                     onClear();
                   }}
-                  className="ml-1 p-0.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-all active:scale-90"
+                  // Nút X rõ ràng hơn, dễ bấm hơn
+                  className="ml-1 p-0.5 rounded-full text-primary hover:bg-primary/20 hover:text-destructive transition-colors active:scale-95 cursor-pointer"
                 >
-                  <X className="size-3 stroke-[3]" />
+                  <X className="size-3.5 stroke-[3]" />
                 </div>
               ) : (
                 <ChevronDown
                   className={cn(
-                    "size-3.5 opacity-40 transition-transform duration-300 ease-out",
+                    "size-4 transition-transform duration-300 ease-out",
+                    // Icon đậm hơn (foreground/50) thay vì opacity-40
+                    isActive ? "text-primary" : "text-muted-foreground/70",
                     "group-data-[state=open]:rotate-180"
                   )}
                 />
@@ -83,13 +95,14 @@ export const FilterDropdown = ({
         align={align}
         sideOffset={8}
         className={cn(
-          "z-[100] p-1 overflow-hidden rounded-2xl border border-border/40 bg-popover shadow-xl animate-in fade-in zoom-in-95 duration-200",
+          // Popover container: Viền rõ, Shadow đậm
+          "z-[100] p-1.5 overflow-hidden rounded-xl border border-border bg-popover shadow-lg animate-in fade-in zoom-in-95 duration-200",
           "w-auto min-w-[240px] max-w-[95vw]",
           contentClassName
         )}
       >
         <div className="flex flex-col max-h-[400px]">
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-0.5">
             {children}
           </div>
         </div>

@@ -2,8 +2,6 @@ import React, { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Play,
-  Pause,
-  Clock,
   Heart,
   MoreHorizontal,
   Lock,
@@ -12,32 +10,19 @@ import {
   Trash2,
   PlusCircle,
   Share2,
-  Calendar,
-  AlertCircle,
   Music2,
-  User,
-  Disc3,
   SearchX,
+  Dot,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { formatDuration } from "@/utils/track-helper";
 
 // Hooks & Store
 import { usePlaylistDetail } from "@/features/playlist/hooks/usePlaylist";
-import { useAppSelector } from "@/store/store";
 
 // UI Components
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +44,8 @@ import { EditPlaylistTracksModal } from "@/features/playlist/components/EditPlay
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import { PlaylistDetailSkeleton } from "@/features/playlist/components/PlaylistDetailSkeleton";
 import PlaylistModal from "@/features/playlist/components/PlaylistModal";
-import { Track } from "@/features/track/types";
+import { TrackList } from "@/features/track/components/TrackList";
+import { useAppSelector } from "@/store/hooks";
 
 dayjs.extend(relativeTime);
 
@@ -76,353 +62,227 @@ const PlaylistDetailPage = () => {
   const playlist = data?.data;
   const { user } = useAppSelector((state) => state.auth);
 
-  // --- PLAYER MOCK ---
-  const activeTrackId = "track_123";
-  const isGlobalPlaying = false;
-
   const isOwner = useMemo(() => {
     return playlist?.user?._id === user?._id || user?.role === "admin";
   }, [playlist, user]);
 
-  // Fallback theme color nếu không có
   const themeColor = useMemo(
-    () => playlist?.themeColor || "#7c3aed", // Violet default
-    [playlist]
+    () => playlist?.themeColor || "#8b5cf6", // Violet-500 default
+    [playlist],
   );
 
-  // --- 1. LOADING STATE ---
+  // --- LOADING / ERROR ---
   if (isLoading) return <PlaylistDetailSkeleton />;
-
-  // --- 2. ERROR / NOT FOUND STATE ---
   if (isError || !playlist)
     return <PlaylistNotFound onBack={() => navigate("/")} />;
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground animate-in fade-in duration-700 overflow-x-hidden selection:bg-primary/20 selection:text-primary">
-      {/* --- LAYER 1: DYNAMIC GRADIENT BACKDROP (Adaptive Light/Dark) --- */}
-      {/* Sử dụng opacity thấp hơn để hòa trộn tốt với cả nền trắng và đen */}
+    <div className="relative min-h-screen bg-background text-foreground animate-in fade-in duration-700 overflow-x-hidden selection:bg-primary/30 selection:text-primary">
+      {/* --- LAYER 1: AMBIENT BACKDROP --- */}
       <div
-        className="absolute inset-0 h-[500px] md:h-[650px] pointer-events-none transition-all duration-1000 ease-out"
+        className="absolute inset-0 h-[60vh] pointer-events-none opacity-25 dark:opacity-20 transition-all duration-1000 ease-out"
         style={{
-          background: `linear-gradient(to bottom, ${themeColor}40 0%, ${themeColor}05 60%, transparent 100%)`,
+          background: `radial-gradient(circle at 50% -20%, ${themeColor}, transparent 70%)`,
         }}
       />
+      <div className="absolute inset-0 h-[60vh] bg-gradient-to-b from-transparent via-background/80 to-background pointer-events-none" />
 
-      <div className="relative z-10">
+      <div className="relative z-10 container mx-auto px-4 md:px-8 pb-24">
         {/* 1. HERO SECTION */}
-        <header className="flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-10 p-6 md:p-10 pt-20 md:pt-28">
-          {/* Cover Art Container */}
-          <div className="group relative shrink-0 shadow-2xl rounded-xl overflow-hidden w-52 h-52 sm:w-60 sm:h-60 md:w-64 md:h-64 border border-border/50 bg-card">
-            {playlist.coverImage ? (
-              <img
-                src={playlist.coverImage}
-                alt={playlist.title}
-                className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-            ) : (
-              <div className="size-full bg-muted/50 flex items-center justify-center">
-                <ListMusic className="size-20 text-muted-foreground/30" />
-              </div>
-            )}
+        <header className="flex flex-col md:flex-row items-center md:items-end gap-8 pt-24 pb-8 md:pt-32 md:pb-10">
+          {/* Cover Art - Vuông vắn, bóng đổ sâu */}
+          <div className="group relative shrink-0">
+            <div className="relative size-52 sm:size-60 md:size-72 rounded-lg shadow-[0_20px_40px_rgba(0,0,0,0.4)] overflow-hidden bg-card border border-white/10 transition-transform duration-500 group-hover:scale-[1.01]">
+              {playlist.coverImage ? (
+                <img
+                  src={playlist.coverImage}
+                  alt={playlist.title}
+                  className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+              ) : (
+                <div className="size-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+                  <ListMusic className="size-20 text-muted-foreground/20" />
+                </div>
+              )}
 
-            {/* Overlay Edit (Chỉ hiện khi hover) */}
-            {isOwner && (
-              <div
-                onClick={() => setIsEditMetaOpen(true)}
-                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer backdrop-blur-[2px]"
-              >
-                <PenSquare className="size-10 text-white mb-2 drop-shadow-md" />
-                <span className="text-white font-bold text-[10px] uppercase tracking-widest drop-shadow-md">
-                  Sửa ảnh bìa
-                </span>
-              </div>
-            )}
+              {/* Edit Overlay (Owner Only) */}
+              {isOwner && (
+                <div
+                  onClick={() => setIsEditMetaOpen(true)}
+                  className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center cursor-pointer backdrop-blur-sm"
+                >
+                  <PenSquare className="size-8 text-white mb-2" />
+                  <span className="text-white text-[10px] font-bold uppercase tracking-widest">
+                    Edit Cover
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Info Section */}
-          <div className="flex flex-col gap-3 w-full text-center md:text-left min-w-0">
-            <div className="flex items-center justify-center md:justify-start gap-2">
+          {/* Playlist Info */}
+          <div className="flex flex-col items-center md:items-start text-center md:text-left gap-4 w-full min-w-0">
+            <div className="flex items-center gap-3">
               <Badge
                 variant="outline"
-                className="bg-background/50 backdrop-blur-sm text-[9px] font-bold uppercase tracking-widest px-2.5 h-6 border-primary/20 text-primary"
+                className="text-[10px] font-bold uppercase tracking-widest h-6 px-2.5 bg-background/40 backdrop-blur-md border-white/10 shadow-sm"
               >
-                {playlist.isSystem ? "System Curated" : "Playlist"}
+                {playlist.isSystem ? "Curated Playlist" : "Public Playlist"}
               </Badge>
-
               {playlist.visibility === "private" && (
                 <Badge
-                  variant="destructive"
-                  className="text-[9px] font-bold h-6 px-2 uppercase tracking-wider"
+                  variant="secondary"
+                  className="text-[10px] font-bold h-6 gap-1 bg-black/40 text-white hover:bg-black/60 border-none"
                 >
-                  <Lock className="size-2.5 mr-1" /> Private
+                  <Lock className="size-2.5" /> Private
                 </Badge>
               )}
             </div>
 
             <h1
-              className={cn(
-                "text-3xl sm:text-5xl md:text-7xl font-black tracking-tight leading-[1.1] line-clamp-2 text-foreground",
-                isOwner &&
-                  "cursor-pointer hover:underline decoration-primary/50 underline-offset-8 transition-all"
-              )}
+              className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter text-foreground leading-[1.1] line-clamp-2 cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => isOwner && setIsEditMetaOpen(true)}
+              title={isOwner ? "Click to edit title" : playlist.title}
             >
               {playlist.title}
             </h1>
 
-            {playlist.description ? (
-              <p className="text-sm md:text-base text-muted-foreground font-medium line-clamp-2 max-w-3xl mt-1">
+            {/* Description */}
+            {playlist.description && (
+              <p className="text-muted-foreground text-sm md:text-base font-medium line-clamp-2 max-w-2xl">
                 {playlist.description}
               </p>
-            ) : (
-              isOwner && (
-                <p
-                  className="text-sm text-muted-foreground/60 italic cursor-pointer hover:text-primary transition-colors"
-                  onClick={() => setIsEditMetaOpen(true)}
-                >
-                  Thêm mô tả cho playlist...
-                </p>
-              )
             )}
 
-            {/* Metadata Footer */}
-            <div className="flex items-center justify-center md:justify-start flex-wrap gap-x-4 gap-y-2 mt-4 text-sm font-medium text-foreground/80">
+            {isOwner && !playlist.description && (
+              <p
+                className="text-sm text-muted-foreground/50 italic cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+                onClick={() => setIsEditMetaOpen(true)}
+              >
+                <PenSquare className="size-3" /> Add a description...
+              </p>
+            )}
+
+            {/* Metadata & User */}
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-y-2 gap-x-1 mt-2 text-sm font-medium text-foreground/90">
               <div
-                className="flex items-center gap-2 group cursor-pointer transition-colors hover:text-primary"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer mr-2 pr-2 border-r border-border/40"
                 onClick={() => navigate(`/profile/${playlist.user?._id}`)}
               >
-                <Avatar className="size-6 border border-border shadow-sm">
+                <Avatar className="size-6 border border-white/10 shadow-sm">
                   <AvatarImage src={playlist.user?.avatar} />
-                  <AvatarFallback className="bg-muted text-[10px] uppercase">
+                  <AvatarFallback className="text-[9px] font-bold">
                     {playlist.user?.fullName?.[0]}
                   </AvatarFallback>
                 </Avatar>
-                <span className="font-bold">{playlist.user?.fullName}</span>
+                <span className="font-bold hover:underline underline-offset-4 decoration-2">
+                  {playlist.user?.fullName}
+                </span>
               </div>
-              <span className="text-muted-foreground hidden sm:inline">•</span>
 
-              <div className="flex items-center gap-1.5">
-                <Disc3 className="size-4 text-muted-foreground" />
-                <span>{playlist.totalTracks || 0} bài hát</span>
-              </div>
-              <span className="text-muted-foreground hidden sm:inline">•</span>
-
-              <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                Cập nhật {dayjs(playlist.updatedAt).fromNow()}
+              <span className="text-muted-foreground">
+                {playlist.totalTracks || 0} songs,
+              </span>
+              <span className="text-muted-foreground opacity-70">
+                updated {dayjs(playlist.updatedAt).fromNow()}
               </span>
             </div>
           </div>
         </header>
 
-        {/* 2. STICKY ACTIONS BAR */}
-        <div className="sticky top-0 z-30 px-6 md:px-10 py-4 flex items-center justify-between backdrop-blur-xl bg-background/80 border-b border-border/40 transition-all">
-          <div className="flex items-center gap-4 sm:gap-6">
+        {/* 2. STICKY ACTION BAR */}
+        <div className="sticky top-[64px] z-30 -mx-4 md:-mx-8 px-4 md:px-8 py-4 mb-6 flex items-center justify-between bg-background/80 backdrop-blur-xl border-b border-white/5 transition-all">
+          <div className="flex items-center gap-4">
+            {/* Primary Action */}
             <Button
               size="icon"
-              className="size-12 sm:size-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-all hover:shadow-primary/25"
+              className="size-14 rounded-full bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(var(--primary),0.3)] hover:scale-105 active:scale-95 transition-all duration-300"
             >
-              <Play className="size-6 sm:size-7 fill-current ml-1" />
+              <Play className="size-6 fill-current ml-1" />
             </Button>
 
+            {/* Owner Tools */}
             {isOwner && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
                 <TooltipAction
-                  label="Quản lý bài hát"
+                  label="Manage Tracks"
                   icon={<ListMusic className="size-5" />}
                   onClick={() => setIsManageTracksOpen(true)}
                 />
                 <TooltipAction
-                  label="Sửa thông tin"
+                  label="Edit Details"
                   icon={<PenSquare className="size-5" />}
                   onClick={() => setIsEditMetaOpen(true)}
                 />
               </div>
             )}
 
+            {/* User Actions */}
             <Button
               variant="ghost"
               size="icon"
-              className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full h-11 w-11 transition-colors"
+              className="text-muted-foreground hover:text-red-500 hover:bg-transparent transition-transform hover:scale-110 ml-2"
             >
-              <Heart className="size-6" />
+              <Heart className="size-7" />
             </Button>
-          </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-foreground h-11 w-11 rounded-full"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground hover:bg-transparent"
+                >
+                  <MoreHorizontal className="size-7" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-56 rounded-xl p-1 border-white/10 bg-background/95 backdrop-blur-md shadow-xl"
               >
-                <MoreHorizontal className="size-7" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-56 rounded-xl p-1.5 border-border/50 shadow-xl bg-popover"
-            >
-              <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
-                <PlusCircle className="size-4" /> Thêm vào hàng chờ
-              </DropdownMenuItem>
-              <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
-                <Share2 className="size-4" /> Chia sẻ Playlist
-              </DropdownMenuItem>
-              {isOwner && (
-                <>
-                  <DropdownMenuSeparator className="bg-border/50 my-1" />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-3 py-2.5 font-bold rounded-lg cursor-pointer"
-                    onClick={() => setIsDeleteOpen(true)}
-                  >
-                    <Trash2 className="size-4" /> Xóa Playlist
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
+                  <PlusCircle className="size-4" /> Add to Queue
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
+                  <Share2 className="size-4" /> Share
+                </DropdownMenuItem>
+                {isOwner && (
+                  <>
+                    <DropdownMenuSeparator className="bg-white/10 my-1" />
+                    <DropdownMenuItem
+                      className="text-red-500 focus:text-red-500 focus:bg-red-500/10 gap-3 py-2.5 font-bold rounded-lg cursor-pointer"
+                      onClick={() => setIsDeleteOpen(true)}
+                    >
+                      <Trash2 className="size-4" /> Delete Playlist
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        {/* 3. TRACKLIST SECTION */}
-        <section className="px-2 sm:px-6 md:px-10 pt-6 pb-32">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent border-b border-border/40 text-muted-foreground/70 uppercase text-[11px] font-bold tracking-wider">
-                <TableHead className="w-12 sm:w-14 text-center">#</TableHead>
-                <TableHead>Tiêu đề</TableHead>
-                <TableHead className="hidden md:table-cell">Album</TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  Ngày thêm
-                </TableHead>
-                <TableHead className="w-16 sm:w-20 text-right">
-                  <Clock className="size-4 ml-auto" />
-                </TableHead>
-              </TableRow>
-            </TableHeader>
+        {/* 3. TRACKLIST */}
+        <div className="bg-background/40 rounded-xl backdrop-blur-sm -mx-2 sm:mx-0">
+          <TrackList tracks={playlist.tracks || []} isLoading={isLoading} />
+        </div>
 
-            <TableBody>
-              {/* --- TRƯỜNG HỢP 1: CÓ DỮ LIỆU --- */}
-              {playlist.tracks?.length > 0 ? (
-                playlist.tracks.map((track: Track, index: number) => {
-                  const isTrackActive = activeTrackId === track._id;
-                  const isPlayingThis = isTrackActive && isGlobalPlaying;
-
-                  return (
-                    <TableRow
-                      key={track._id}
-                      className={cn(
-                        "group border-none transition-colors duration-200 rounded-lg cursor-pointer h-14 sm:h-16",
-                        isTrackActive
-                          ? "bg-primary/10 hover:bg-primary/15" // Active state
-                          : "hover:bg-muted/50" // Hover state chuẩn light/dark
-                      )}
-                    >
-                      {/* Index / Animation */}
-                      <TableCell className="text-center relative p-0">
-                        <div className="flex items-center justify-center font-mono text-sm text-muted-foreground w-full h-full">
-                          {isPlayingThis ? (
-                            <div className="flex items-end gap-[2px] h-3.5">
-                              <span className="w-1 bg-primary animate-music-bar-1 rounded-t-sm" />
-                              <span className="w-1 bg-primary animate-music-bar-2 rounded-t-sm" />
-                              <span className="w-1 bg-primary animate-music-bar-3 rounded-t-sm" />
-                            </div>
-                          ) : (
-                            <>
-                              <span
-                                className={cn(
-                                  "group-hover:hidden",
-                                  isTrackActive && "text-primary font-bold"
-                                )}
-                              >
-                                {index + 1}
-                              </span>
-                              <Play className="hidden group-hover:block size-4 fill-foreground text-foreground ml-1" />
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Info */}
-                      <TableCell className="max-w-[200px] sm:max-w-none">
-                        <div className="flex items-center gap-3">
-                          <div className="relative shrink-0">
-                            <img
-                              src={track.coverImage}
-                              className="size-10 rounded-md object-cover shadow-sm border border-border/10"
-                              alt=""
-                            />
-                            {/* Optional: Playing Overlay */}
-                            {isPlayingThis && (
-                              <div className="absolute inset-0 bg-black/40 rounded-md flex items-center justify-center">
-                                <Music2 className="size-5 text-white animate-pulse" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span
-                              className={cn(
-                                "font-bold truncate text-sm sm:text-base transition-colors",
-                                isTrackActive
-                                  ? "text-primary"
-                                  : "text-foreground group-hover:text-primary"
-                              )}
-                            >
-                              {track.title}
-                            </span>
-                            <span className="text-xs text-muted-foreground truncate font-medium group-hover:text-foreground/80 transition-colors">
-                              {track.artist?.name}
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      {/* Album */}
-                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground font-medium hover:text-foreground hover:underline cursor-pointer transition-colors max-w-[200px] truncate">
-                        {track.album?.title || "Single"}
-                      </TableCell>
-
-                      {/* Date */}
-                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground/60 font-mono">
-                        {dayjs(playlist.createdAt).format("DD/MM/YYYY")}
-                      </TableCell>
-
-                      {/* Duration */}
-                      <TableCell className="text-right text-xs font-mono text-muted-foreground group-hover:text-foreground">
-                        {formatDuration(track.duration)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                /* --- TRƯỜNG HỢP 2: PLAYLIST RỖNG --- */
-                <TableRow className="hover:bg-transparent border-none">
-                  <TableCell colSpan={5} className="h-[400px] p-0">
-                    <EmptyPlaylistState
-                      isOwner={isOwner}
-                      onAdd={() => setIsManageTracksOpen(true)}
-                    />
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-
-          {/* Footer Metadata */}
-          {playlist.tracks?.length > 0 && (
-            <footer className="mt-16 py-12 border-t border-border/40 flex flex-col gap-2 items-center text-muted-foreground">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-                <Calendar className="size-3.5" /> Created{" "}
-                {dayjs(playlist.createdAt).format("MMM D, YYYY")}
-              </div>
-              <p className="text-[10px] opacity-60">
-                © {new Date().getFullYear()} Studio Music Platform.
-              </p>
-            </footer>
-          )}
-        </section>
+        {/* Footer */}
+        {playlist.tracks?.length > 0 && (
+          <footer className="mt-16 pt-8 border-t border-border/20 flex flex-col gap-2 items-center text-xs text-muted-foreground/60 font-medium">
+            <div className="flex items-center gap-2">
+              <span>
+                Created {dayjs(playlist.createdAt).format("MMMM D, YYYY")}
+              </span>
+              <Dot className="size-3" />
+              <span>{playlist.tracks.length} songs</span>
+            </div>
+            <p>© {new Date().getFullYear()} Music Platform</p>
+          </footer>
+        )}
       </div>
 
-      {/* --- MODAL SYSTEM --- */}
+      {/* --- MODALS --- */}
       <PlaylistModal
         isOpen={isEditMetaOpen}
         onClose={() => setIsEditMetaOpen(false)}
@@ -437,18 +297,18 @@ const PlaylistDetailPage = () => {
         isOpen={isDeleteOpen}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={() => {
-          // Logic delete API
+          /* Logic delete */
         }}
-        title="Xóa Playlist vĩnh viễn?"
-        description={`"${playlist?.title}" sẽ bị gỡ bỏ khỏi thư viện của bạn. Hành động này không thể hoàn tác.`}
-        confirmLabel="Xóa ngay"
+        title="Delete Playlist?"
+        description={`This will permanently delete "${playlist?.title}" from your library.`}
+        confirmLabel="Delete Forever"
         isDestructive
       />
     </div>
   );
 };
 
-// --- SUB-COMPONENTS (Tách ra và Style chuẩn) ---
+// --- SUB-COMPONENTS (Clean & Styled) ---
 
 const TooltipAction = ({
   label,
@@ -460,25 +320,24 @@ const TooltipAction = ({
   onClick: () => void;
 }) => (
   <TooltipProvider>
-    <Tooltip>
+    <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>
         <Button
-          variant="secondary" // Dùng secondary thay vì custom class cứng
+          variant="ghost"
           size="icon"
-          className="rounded-full size-11 bg-background/50 hover:bg-background border border-border/50 transition-all"
+          className="text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-full size-10"
           onClick={onClick}
         >
           {icon}
         </Button>
       </TooltipTrigger>
-      <TooltipContent className="font-bold text-[10px] uppercase tracking-widest bg-popover text-popover-foreground border-border shadow-lg">
+      <TooltipContent className="font-bold text-[10px] uppercase tracking-widest bg-black text-white border-white/20 shadow-lg mb-2">
         {label}
       </TooltipContent>
     </Tooltip>
   </TooltipProvider>
 );
 
-// --- COMPONENT: EMPTY STATE (Đẹp hơn, chuẩn theme) ---
 const EmptyPlaylistState = ({
   isOwner,
   onAdd,
@@ -486,60 +345,59 @@ const EmptyPlaylistState = ({
   isOwner: boolean;
   onAdd: () => void;
 }) => (
-  <div className="flex flex-col items-center justify-center h-full gap-6 animate-in slide-in-from-bottom-4 duration-500">
-    <div className="relative group">
-      {/* Glow Effect */}
-      <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full group-hover:bg-primary/30 transition-all" />
-      <div className="relative size-24 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center shadow-inner">
-        <Disc3 className="size-10 text-muted-foreground/50 group-hover:text-primary transition-colors duration-500 animate-slow-spin" />
+  <div className="flex flex-col items-center justify-center h-full gap-6 animate-in slide-in-from-bottom-4 duration-700">
+    <div className="relative group cursor-default">
+      <div className="absolute inset-0 bg-primary/20 blur-[60px] rounded-full group-hover:bg-primary/30 transition-all duration-1000" />
+      <div className="relative size-28 rounded-full bg-card border-2 border-dashed border-muted-foreground/20 flex items-center justify-center shadow-sm">
+        <Music2 className="size-12 text-muted-foreground/30" />
       </div>
     </div>
-
     <div className="space-y-2 text-center max-w-sm">
       <h3 className="text-xl font-bold tracking-tight text-foreground">
-        Playlist này còn trống
+        It's a bit quiet here
       </h3>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground leading-relaxed">
         {isOwner
-          ? "Hãy bắt đầu thêm những bài hát yêu thích để tạo nên giai điệu của riêng bạn."
-          : "Người tạo chưa thêm bài hát nào vào playlist này."}
+          ? "Start building your dream collection. Add songs to get the vibe going."
+          : "This playlist is currently empty."}
       </p>
     </div>
-
     {isOwner && (
       <Button
         onClick={onAdd}
         size="lg"
-        className="rounded-full px-8 font-bold uppercase text-xs tracking-widest shadow-lg shadow-primary/20"
+        className="rounded-full px-8 font-bold uppercase text-xs tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
       >
-        <PlusCircle className="size-4 mr-2" />
-        Thêm bài hát ngay
+        Find Songs
       </Button>
     )}
   </div>
 );
 
-// --- COMPONENT: NOT FOUND / ERROR (Toàn màn hình) ---
 const PlaylistNotFound = ({ onBack }: { onBack: () => void }) => (
-  <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 text-center px-6 animate-in zoom-in-95 duration-300">
-    <div className="size-24 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
-      <SearchX className="size-12 text-destructive opacity-80" />
+  <div className="flex flex-col items-center justify-center min-h-screen gap-8 text-center px-6 animate-in zoom-in-95 duration-500">
+    <div className="relative">
+      <div className="absolute inset-0 bg-red-500/10 blur-[80px] rounded-full scale-150" />
+      <div className="size-28 rounded-full bg-background border-4 border-muted flex items-center justify-center relative z-10 shadow-2xl">
+        <SearchX className="size-12 text-muted-foreground" />
+      </div>
     </div>
-    <div className="space-y-2">
-      <h2 className="text-3xl font-black tracking-tight text-foreground">
-        Không tìm thấy Playlist
+    <div className="space-y-3">
+      <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase">
+        Playlist Not Found
       </h2>
-      <p className="text-muted-foreground max-w-[300px] mx-auto">
-        Playlist bạn đang tìm kiếm có thể đã bị xóa, chuyển sang chế độ riêng tư
-        hoặc đường dẫn không chính xác.
+      <p className="text-muted-foreground text-lg max-w-md mx-auto leading-relaxed">
+        The playlist you are looking for might have been deleted, set to
+        private, or the link is incorrect.
       </p>
     </div>
     <Button
-      onClick={onBack}
       variant="outline"
-      className="rounded-full px-8 h-11 font-bold uppercase text-[11px] tracking-widest border-border hover:bg-accent"
+      onClick={onBack}
+      size="lg"
+      className="rounded-full px-10 h-12 font-bold uppercase tracking-widest border-border hover:bg-foreground hover:text-background transition-all duration-300"
     >
-      Quay lại trang chủ
+      Back to Home
     </Button>
   </div>
 );

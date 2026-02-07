@@ -1,9 +1,11 @@
 import React from "react";
-import { Plus, X, LayoutGrid } from "lucide-react";
+import { Plus, X, LayoutGrid, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ArtistFormValues } from "@/features/artist/schemas/artist.schema";
 import { UseFormReturn } from "react-hook-form";
+import { cn } from "@/lib/utils";
+
 interface GallerySectionProps {
   form: UseFormReturn<ArtistFormValues>;
 }
@@ -14,7 +16,6 @@ const GallerySection: React.FC<GallerySectionProps> = ({ form }) => {
 
   const handleAddImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    // Giới hạn số lượng ảnh nếu cần (ví dụ tối đa 10 ảnh)
     if (images.length + files.length > 10) {
       alert("Tối đa 10 hình ảnh cho gallery");
       return;
@@ -28,59 +29,71 @@ const GallerySection: React.FC<GallerySectionProps> = ({ form }) => {
   };
 
   return (
-    <div className="space-y-4 pt-6 border-t border-border/50">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-end justify-between border-b border-border pb-4">
         <div className="space-y-1">
-          <Label className="text-sm font-bold text-foreground uppercase flex items-center gap-2">
+          <Label className="text-xs font-bold text-foreground uppercase flex items-center gap-2 tracking-wider">
             <LayoutGrid className="size-4 text-primary" /> Gallery & Portfolio
           </Label>
-          <p className="text-[11px] text-muted-foreground">
-            Hình ảnh sẽ hiển thị trong slider chi tiết nghệ sĩ.
+          <p className="text-xs text-foreground/70 font-medium">
+            Hình ảnh hiển thị trong slider chi tiết nghệ sĩ (Tối đa 10 ảnh).
           </p>
         </div>
-        <span className="text-[10px] bg-muted px-2 py-1 rounded-full font-medium">
+        <div
+          className={cn(
+            "text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm",
+            images.length > 0
+              ? "bg-primary/10 text-primary border-primary/20"
+              : "bg-muted text-muted-foreground border-border"
+          )}
+        >
           {images.length} / 10
-        </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      {/* Grid Images */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {images.map((img: any, index: number) => {
-          // Xử lý preview an toàn
           const isFile = img instanceof File;
           const previewUrl = isFile ? URL.createObjectURL(img) : img;
 
           return (
             <div
               key={index}
-              className="group relative aspect-square rounded-xl border border-border bg-muted overflow-hidden hover:shadow-md transition-all"
+              className="group relative aspect-square rounded-xl border border-input bg-background overflow-hidden shadow-sm hover:shadow-md transition-all ring-1 ring-black/5"
             >
               <img
                 src={previewUrl}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 alt={`Gallery ${index}`}
-                onLoad={() => isFile && URL.revokeObjectURL(previewUrl)} // Giải phóng bộ nhớ sau khi load (tùy thuộc vào logic app)
+                onLoad={() => isFile && URL.revokeObjectURL(previewUrl)}
               />
-              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+              {/* Overlay Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+              {/* Delete Button */}
               <Button
                 type="button"
                 variant="destructive"
                 size="icon"
-                className="absolute top-1.5 right-1.5 size-6 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100 shadow-lg"
+                className="absolute top-2 right-2 size-7 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100 shadow-lg border border-white/20"
                 onClick={() => removeImage(index)}
               >
-                <X className="size-3" />
+                <X className="size-3.5" />
               </Button>
             </div>
           );
         })}
 
-        {/* Nút thêm ảnh */}
+        {/* Add Button */}
         {images.length < 10 && (
-          <label className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl cursor-pointer hover:bg-accent hover:border-primary/50 transition-all group active:scale-95">
-            <div className="p-2 bg-muted rounded-full group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-              <Plus className="size-5" />
+          <label className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-input rounded-xl cursor-pointer bg-secondary/20 hover:bg-secondary/40 hover:border-primary/50 transition-all group active:scale-95">
+            <div className="p-3 bg-background rounded-full shadow-sm border border-border group-hover:scale-110 transition-transform mb-2">
+              <Plus className="size-5 text-muted-foreground group-hover:text-primary" />
             </div>
-            <span className="text-[10px] font-bold uppercase mt-2 text-muted-foreground group-hover:text-primary">
+            <span className="text-[10px] font-bold uppercase text-foreground/60 group-hover:text-primary tracking-wide">
               Add Photo
             </span>
             <input

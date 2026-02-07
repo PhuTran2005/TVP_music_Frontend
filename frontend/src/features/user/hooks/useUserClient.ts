@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 // Redux
-import { useAppDispatch } from "@/store/store";
 
 // API & Types
 import userApi from "../api/userApi";
@@ -21,6 +20,7 @@ import {
   type ClaimInput,
 } from "@/features/user/schemas/user.schema";
 import authApi from "@/features/auth/api/authApi";
+import { useAppDispatch } from "@/store/hooks";
 
 // ============================================================================
 // 1. HOOK: LẤY PROFILE CÔNG KHAI (Xem tường người khác)

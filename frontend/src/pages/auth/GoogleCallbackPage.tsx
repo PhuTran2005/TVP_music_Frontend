@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAppDispatch } from "@/store/store";
 import authApi from "@/features/auth/api/authApi";
 import { PulseLoader } from "@/components/ui/MusicLoadingEffects";
 import { login } from "@/features";
 import { toast } from "sonner";
+import { useAppDispatch } from "@/store/hooks";
 
 const GoogleCallbackPage = () => {
   const [searchParams] = useSearchParams();
@@ -28,7 +28,7 @@ const GoogleCallbackPage = () => {
             login({
               accessToken,
               user: user, // Truyền user object vào đây
-            })
+            }),
           );
           toast.success("Welcome back!", {
             description: `Logged in successfully as ${

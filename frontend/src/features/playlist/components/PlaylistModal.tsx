@@ -43,7 +43,7 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
 }) => {
   const { form, preview, handleFileChange } = usePlaylistForm(
     playlistToEdit,
-    isOpen
+    isOpen,
   );
   const {
     register,
@@ -57,37 +57,44 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop: Tối hơn để tăng tương phản */}
       <div
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300"
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
       />
 
-      {/* Modal Container */}
-      <div className="relative z-101 w-full max-w-2xl bg-card border border-border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden rounded-2xl animate-in zoom-in-95 duration-200">
+      {/* Modal Container: Viền rõ, Shadow đậm */}
+      <div className="relative z-[101] w-full max-w-2xl bg-background border border-border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden rounded-2xl animate-in zoom-in-95 duration-200 ring-1 ring-white/10">
         {/* HEADER */}
-        <div className="shrink-0 px-6 py-4 border-b flex justify-between items-center bg-muted/5">
+        <div className="shrink-0 px-6 py-4 border-b border-border flex justify-between items-center bg-background">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+            <div className="p-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary shadow-sm">
               <ImageIcon className="size-5" />
             </div>
-            <h3 className="font-bold text-base text-foreground">
-              {playlistToEdit ? "Cập nhật Playlist" : "Tạo Playlist mới"}
-            </h3>
+            <div>
+              <h3 className="font-bold text-lg text-foreground leading-none">
+                {playlistToEdit ? "Update Playlist" : "New Playlist"}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 font-medium">
+                {playlistToEdit
+                  ? "Edit your collection details"
+                  : "Curate your own music collection"}
+              </p>
+            </div>
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="rounded-full h-8 w-8"
+            className="rounded-full h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
-            <X className="size-4" />
+            <X className="size-5" />
           </Button>
         </div>
 
         {/* BODY */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-muted/10">
           <form
             id="playlist-form"
             onSubmit={handleSubmit(onSubmit)}
@@ -96,24 +103,32 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
             {/* Top Section: Artwork & Basic Info */}
             <div className="flex flex-col sm:flex-row gap-6">
               {/* Artwork */}
-              <div className="space-y-3 shrink-0">
-                <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
-                  Ảnh bìa
+              <div className="space-y-2 shrink-0">
+                <Label className="text-xs font-bold uppercase text-foreground/80 tracking-wider">
+                  Cover Image
                 </Label>
-                <div className="relative group size-32 sm:size-40 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted/20 transition-all hover:border-primary/40">
+                <div className="relative group size-32 sm:size-40 rounded-xl border-2 border-dashed border-input overflow-hidden bg-background shadow-sm transition-all hover:border-primary hover:bg-accent">
                   {preview ? (
                     <img
                       src={preview}
                       alt="Cover"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/30">
-                      <ImageIcon className="size-8" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/50">
+                      <ImageIcon className="size-10 mb-2 opacity-50" />
+                      <span className="text-[10px] uppercase font-bold">
+                        Upload
+                      </span>
                     </div>
                   )}
-                  <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center cursor-pointer text-white">
-                    <Camera className="size-6" />
+
+                  {/* Overlay Upload Button */}
+                  <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer text-white backdrop-blur-[2px]">
+                    <Camera className="size-6 mb-1" />
+                    <span className="text-[10px] font-bold uppercase">
+                      Change
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
@@ -122,34 +137,39 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
                     />
                   </label>
                 </div>
+
                 {/* Theme Color Picker Mini */}
-                <div className="flex items-center gap-2 bg-muted/50 p-1.5 rounded-lg border w-fit">
-                  <Palette className="size-3 text-muted-foreground" />
+                <div className="flex items-center gap-2 bg-background p-1.5 rounded-lg border border-input w-fit shadow-sm">
+                  <Palette className="size-3.5 text-foreground/70" />
                   <input
                     type="color"
                     {...register("themeColor")}
-                    className="size-4 bg-transparent border-none cursor-pointer"
+                    className="size-5 bg-transparent border-none cursor-pointer rounded-sm overflow-hidden"
                   />
                 </div>
               </div>
 
               {/* Title & Desc */}
-              <div className="flex-1 space-y-4">
+              <div className="flex-1 space-y-5">
                 <div className="space-y-2">
                   <Label
                     htmlFor="title"
-                    className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider"
+                    className="text-xs font-bold uppercase text-foreground/80 tracking-wider"
                   >
-                    Tiêu đề *
+                    Title <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="title"
                     {...register("title")}
-                    placeholder="VD: Chill cuối tuần..."
-                    className={cn(errors.title && "border-destructive")}
+                    placeholder="E.g., Chill Vibes 2024..."
+                    className={cn(
+                      "h-10 font-semibold bg-background border-input focus-visible:ring-2 focus-visible:ring-primary/20",
+                      errors.title &&
+                        "border-destructive focus-visible:ring-destructive/20",
+                    )}
                   />
                   {errors.title && (
-                    <p className="text-[10px] text-destructive font-medium">
+                    <p className="text-[11px] text-destructive font-bold animate-in slide-in-from-left-1">
                       {errors.title.message as string}
                     </p>
                   )}
@@ -158,15 +178,15 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 <div className="space-y-2">
                   <Label
                     htmlFor="description"
-                    className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider"
+                    className="text-xs font-bold uppercase text-foreground/80 tracking-wider"
                   >
-                    Mô tả
+                    Description
                   </Label>
                   <Textarea
                     id="description"
                     {...register("description")}
-                    placeholder="Vài dòng giới thiệu..."
-                    className="resize-none h-20 text-xs"
+                    placeholder="Tell us about this playlist..."
+                    className="resize-none h-[88px] text-sm bg-background border-input focus-visible:ring-2 focus-visible:ring-primary/20"
                   />
                 </div>
               </div>
@@ -174,8 +194,8 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
 
             {/* Tags */}
             <div className="space-y-2">
-              <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
-                <Tags className="size-3" /> Từ khóa (Tags)
+              <Label className="text-xs font-bold uppercase text-foreground/80 tracking-wider flex items-center gap-2">
+                <Tags className="size-3.5" /> Tags
               </Label>
               <Controller
                 name="tags"
@@ -184,16 +204,17 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
                   <TagInput
                     value={field.value || []}
                     onChange={field.onChange}
-                    placeholder="Nhấn Enter để thêm..."
+                    placeholder="Enter tags..."
+                    className="bg-background border-input min-h-[42px]"
                   />
                 )}
               />
             </div>
 
             {/* Advanced: Collaborators */}
-            <div className="space-y-3 pt-4 border-t">
-              <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
-                <Users className="size-3" /> Cộng tác viên
+            <div className="space-y-3 pt-6 border-t border-border">
+              <Label className="text-xs font-bold uppercase text-foreground/80 tracking-wider flex items-center gap-2">
+                <Users className="size-3.5" /> Collaborators
               </Label>
               <Controller
                 name="collaborators"
@@ -204,39 +225,42 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
                     value={field.value}
                     onChange={field.onChange}
                     initialUsers={playlistToEdit?.collaborators}
-                    placeholder="Chọn người cùng quản lý..."
+                    placeholder="Invite others to manage..."
                   />
                 )}
               />
             </div>
 
             {/* Visibility Settings */}
-            <div className="space-y-3 pt-4 border-t">
-              <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
-                Chế độ hiển thị
+            <div className="space-y-3 pt-6 border-t border-border">
+              <Label className="text-xs font-bold uppercase text-foreground/80 tracking-wider">
+                Visibility
               </Label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 {[
                   {
                     id: "public",
                     label: "Public",
                     icon: Globe,
-                    color: "text-emerald-500",
-                    bg: "bg-emerald-500/10",
+                    activeColor: "text-emerald-600 dark:text-emerald-400",
+                    activeBg: "bg-emerald-500/10 border-emerald-500/50",
+                    defaultIconColor: "text-emerald-500/70",
                   },
                   {
                     id: "private",
                     label: "Private",
                     icon: Lock,
-                    color: "text-orange-500",
-                    bg: "bg-orange-500/10",
+                    activeColor: "text-orange-600 dark:text-orange-400",
+                    activeBg: "bg-orange-500/10 border-orange-500/50",
+                    defaultIconColor: "text-orange-500/70",
                   },
                   {
                     id: "unlisted",
                     label: "Unlisted",
                     icon: Link,
-                    color: "text-blue-500",
-                    bg: "bg-blue-500/10",
+                    activeColor: "text-blue-600 dark:text-blue-400",
+                    activeBg: "bg-blue-500/10 border-blue-500/50",
+                    defaultIconColor: "text-blue-500/70",
                   },
                 ].map((item) => {
                   const isSelected = watch("visibility") === item.id;
@@ -245,26 +269,44 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
                       key={item.id}
                       onClick={() => setValue("visibility", item.id as any)}
                       className={cn(
-                        "relative p-3 rounded-xl border transition-all cursor-pointer flex flex-col items-center gap-2",
+                        "relative p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col items-center gap-2 select-none",
                         isSelected
-                          ? "border-primary bg-primary/3 ring-1 ring-primary/20"
-                          : "border-border hover:bg-muted/50"
+                          ? cn("ring-1 ring-primary/5 shadow-sm", item.activeBg)
+                          : "border-transparent bg-background hover:bg-accent hover:border-accent border-input/50",
                       )}
                     >
                       <div
                         className={cn(
-                          "p-2 rounded-lg",
-                          item.bg,
-                          isSelected ? "scale-110" : "grayscale opacity-50"
+                          "p-2 rounded-lg transition-colors",
+                          isSelected ? "bg-background shadow-sm" : "bg-muted",
                         )}
                       >
-                        <item.icon className={cn("size-4", item.color)} />
+                        <item.icon
+                          className={cn(
+                            "size-4",
+                            isSelected
+                              ? item.activeColor
+                              : "text-muted-foreground",
+                          )}
+                        />
                       </div>
-                      <span className="text-[11px] font-bold">
+                      <span
+                        className={cn(
+                          "text-xs font-bold",
+                          isSelected
+                            ? "text-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      >
                         {item.label}
                       </span>
                       {isSelected && (
-                        <CheckCircle2 className="size-3 absolute top-1.5 right-1.5 text-primary" />
+                        <CheckCircle2
+                          className={cn(
+                            "size-4 absolute top-2 right-2",
+                            item.activeColor,
+                          )}
+                        />
                       )}
                     </div>
                   );
@@ -275,38 +317,42 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
         </div>
 
         {/* FOOTER */}
-        <div className="shrink-0 px-6 py-4 border-t bg-muted/5 flex justify-between items-center">
-          <div className="flex items-center gap-2 opacity-50">
-            <ShieldCheck className="size-3" />
-            <span className="text-[10px] font-medium">Verified Action</span>
+        <div className="shrink-0 px-6 py-4 border-t border-border bg-background flex justify-between items-center z-20">
+          <div className="flex items-center gap-2 text-muted-foreground/70">
+            <ShieldCheck className="size-3.5" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide">
+              Secure Save
+            </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={onClose}
               disabled={isPending}
+              className="font-semibold text-muted-foreground hover:text-foreground"
             >
-              Hủy
+              Cancel
             </Button>
             <Button
               form="playlist-form"
               type="submit"
               size="sm"
-              className="px-6"
+              className="px-6 font-bold shadow-md hover:shadow-lg transition-all"
+              disabled={isPending}
             >
               {isPending ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin mr-2" />
               ) : (
                 <Save className="size-4 mr-2" />
               )}
-              {playlistToEdit ? "Lưu" : "Khởi tạo"}
+              {playlistToEdit ? "Save" : "Create Playlist"}
             </Button>
           </div>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 

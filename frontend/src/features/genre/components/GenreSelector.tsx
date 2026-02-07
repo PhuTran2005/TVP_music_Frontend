@@ -43,7 +43,7 @@ export const GenreSelector: React.FC<GenreSelectorProps> = ({
 
   const rawGenres = useMemo(() => genreRes?.data?.data || [], [genreRes]);
 
-  // Logic Tree Data (Giữ nguyên logic của bạn)
+  // Logic Tree Data
   const treeData = useMemo(() => {
     if (!rawGenres.length) return [];
     const childrenMap = new Map<string, Genre[]>();
@@ -109,23 +109,24 @@ export const GenreSelector: React.FC<GenreSelectorProps> = ({
   };
 
   return (
-    <div className={cn("space-y-2.5 w-full", className)}>
+    <div className={cn("space-y-3 w-full", className)}>
       {/* --- LABEL --- */}
       {label && (
-        <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-[0.15em] flex items-center gap-1.5 ml-0.5">
+        <Label className="text-xs font-bold uppercase text-foreground/80 tracking-wider flex items-center gap-1.5 ml-0.5">
           {label}{" "}
-          {required && <span className="text-destructive font-black">*</span>}
+          {required && <span className="text-destructive text-sm">*</span>}
         </Label>
       )}
 
-      {/* Search */}
+      {/* Search Input Container */}
       <div className="relative group">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground transition-colors group-focus-within:text-primary" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
         <Input
           placeholder="Lọc thể loại..."
+          // Thay đổi: Nền rõ hơn (bg-background), viền rõ hơn (border-input)
           className={cn(
-            "pl-9 h-10 text-sm bg-muted/20 border-none rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40",
-            error && "ring-1 ring-destructive/50"
+            "pl-9 h-10 text-sm bg-background border-input shadow-sm rounded-lg focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
+            error && "border-destructive focus-visible:ring-destructive/20"
           )}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -133,54 +134,61 @@ export const GenreSelector: React.FC<GenreSelectorProps> = ({
       </div>
 
       {/* List container */}
-      <div className="max-h-52 overflow-y-auto custom-scrollbar border border-border/50 rounded-xl bg-muted/5 overflow-hidden">
+      {/* Thay đổi: Viền đậm hơn, bỏ nền xám mờ để tăng tương phản chữ */}
+      <div className="max-h-60 overflow-y-auto custom-scrollbar border border-border shadow-sm rounded-lg bg-background overflow-hidden">
         {isLoading ? (
-          <div className="flex justify-center items-center py-10 text-xs text-muted-foreground gap-2">
-            <Loader2 className="size-3.5 animate-spin text-primary" /> Đang
-            tải...
+          <div className="flex justify-center items-center py-12 text-sm text-muted-foreground gap-2">
+            <Loader2 className="size-4 animate-spin text-primary" /> Đang tải...
           </div>
         ) : displayGenres.length > 0 ? (
-          <div className="p-1">
+          <div className="p-1.5 space-y-0.5">
             {displayGenres.map((g) => {
               const isSelected = Array.isArray(value) && value.includes(g._id);
               return (
                 <div
                   key={g._id}
                   className={cn(
-                    "relative flex items-center gap-2 px-3 py-2 text-xs transition-all rounded-lg select-none mb-0.5",
+                    "relative flex items-center gap-2 px-3 py-2.5 text-sm transition-all rounded-md select-none border border-transparent",
                     g.isDisabled
-                      ? "opacity-30 cursor-not-allowed grayscale pointer-events-none"
-                      : "cursor-pointer hover:bg-muted/80",
+                      ? "opacity-40 cursor-not-allowed bg-muted/50"
+                      : "cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                    // Thay đổi: Trạng thái Active đậm hơn, có border nhẹ
                     isSelected &&
                       !g.isDisabled &&
-                      "bg-primary/10 text-primary font-bold shadow-sm"
+                      "bg-primary/15 text-primary font-semibold border-primary/20 shadow-sm"
                   )}
                   style={{
-                    paddingLeft: !filter ? `${12 + g.level * 18}px` : "12px",
+                    paddingLeft: !filter ? `${12 + g.level * 20}px` : "12px",
                   }}
                   onClick={() => !g.isDisabled && toggleGenre(g._id)}
                 >
+                  {/* Tree Lines Icon */}
                   {!filter && g.level > 0 && (
-                    <CornerDownRight className="size-3 text-primary/40 shrink-0" />
+                    <CornerDownRight
+                      // Thay đổi: Màu icon đậm hơn để dễ nhìn cấu trúc
+                      className="size-3.5 text-muted-foreground/70 shrink-0"
+                    />
                   )}
-                  <span className="flex-1 truncate uppercase tracking-tight">
-                    {g.name}
-                  </span>
-                  {isSelected && <Check className="size-3 stroke-[3]" />}
+
+                  <span className="flex-1 truncate leading-none">{g.name}</span>
+
+                  {isSelected && (
+                    <Check className="size-4 stroke-[3] text-primary" />
+                  )}
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="py-10 text-center text-[10px] uppercase font-bold text-muted-foreground opacity-50">
-            Trống
+          <div className="py-12 text-center text-xs font-bold text-muted-foreground/70 uppercase tracking-widest">
+            Không tìm thấy kết quả
           </div>
         )}
       </div>
 
       {/* Tags for Multi-select */}
       {!singleSelect && value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
+        <div className="flex flex-wrap gap-2 pt-1">
           {value.map((id) => {
             const g = rawGenres.find((item) => item._id === id);
             if (!g) return null;
@@ -188,13 +196,16 @@ export const GenreSelector: React.FC<GenreSelectorProps> = ({
               <Badge
                 key={id}
                 variant="secondary"
-                className="h-6 px-2 bg-primary/5 text-primary border-primary/10 text-[10px] font-bold uppercase rounded-md"
+                // Thay đổi: Badge rõ ràng hơn với viền và nền tách biệt
+                className="h-7 pl-2.5 pr-1.5 bg-secondary text-secondary-foreground border border-border/50 text-[11px] font-bold uppercase rounded-md shadow-sm hover:bg-secondary/80 transition-colors"
               >
                 {g.name}
-                <X
-                  className="size-2.5 ml-1.5 cursor-pointer hover:text-destructive transition-colors"
+                <div
+                  className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive cursor-pointer transition-colors"
                   onClick={() => toggleGenre(id)}
-                />
+                >
+                  <X className="size-3" />
+                </div>
               </Badge>
             );
           })}
@@ -202,7 +213,9 @@ export const GenreSelector: React.FC<GenreSelectorProps> = ({
       )}
 
       {error && (
-        <p className="text-[10px] text-destructive font-bold ml-1">{error}</p>
+        <div className="flex items-center gap-1.5 mt-1.5 text-destructive animate-in slide-in-from-left-1">
+          <span className="text-[11px] font-bold">{error}</span>
+        </div>
       )}
     </div>
   );

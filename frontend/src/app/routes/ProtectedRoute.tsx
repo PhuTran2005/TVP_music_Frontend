@@ -1,6 +1,6 @@
 import { EqualizerLoader } from "@/components/ui/MusicLoadingEffects";
 import MusicResult from "@/components/ui/Result";
-import { useAppSelector } from "@/store/store";
+import { useAppSelector } from "@/store/hooks";
 import React from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 

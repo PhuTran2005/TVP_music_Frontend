@@ -20,6 +20,7 @@ import {
   Users,
   X,
   KeyboardMusic,
+  UserCheck,
 } from "lucide-react";
 
 // --- Menu Data giữ nguyên ---
@@ -71,6 +72,11 @@ const sidebarGroups = [
         label: "Users",
         path: `${ADMIN_PATHS.ADMIN}/${ADMIN_PATHS.USERS}`,
         icon: Users,
+      },
+      {
+        label: "Verification Artists",
+        path: `${ADMIN_PATHS.ADMIN}/${ADMIN_PATHS.VERIFY_ARTIST}`,
+        icon: UserCheck,
       },
       { label: "Comments", path: "/comments", icon: MessageSquare },
     ],

@@ -91,7 +91,7 @@ export const YearPicker: React.FC<YearPickerProps> = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-2 w-full min-w-[200px] p-2 bg-popover text-popover-foreground border border-border rounded-xl shadow-lg animate-in fade-in zoom-in-95">
+        <div className="absolute z-50 mt-2 w-full min-w-[200px] pt-2 pb-2 bg-popover text-popover-foreground border border-border rounded-xl shadow-lg animate-in fade-in zoom-in-95">
           <div
             ref={scrollRef}
             className="grid grid-cols-4 gap-1 max-h-60 overflow-y-auto custom-scrollbar p-1"

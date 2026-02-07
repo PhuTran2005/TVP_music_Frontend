@@ -39,7 +39,6 @@ const PlaylistPage = () => {
     });
   }, [debouncedSearch, setFilterParams]);
 
-  console.log(playlists);
   const totalPages = meta.totalPages || 1;
   const totalItems = meta.totalItems || 0;
   const pageSize = meta.pageSize || APP_CONFIG.PAGINATION_LIMIT;
@@ -52,36 +51,51 @@ const PlaylistPage = () => {
       {/* --- FILTER --- */}
       <PlaylistFilter params={filterParams} setParams={setFilterParams} />
 
-      {/* --- CONTENT --- */}
-      {isLoading ? (
-        <CardSkeleton count={8} />
-      ) : playlists.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 animate-in fade-in duration-500">
-          {playlists.map((playlist: Playlist) => (
-            <PublicPlaylistCard key={playlist._id} playlist={playlist} />
-          ))}
-        </div>
-      ) : (
-        <div className="py-12">
-          <MusicResult
-            status="empty"
-            title="No playlists found"
-            description="Try changing the filter or create a new playlist."
-          />
-        </div>
-      )}
+      {/* 🔥 FIX: Added mx-auto */}
+      <section className="container mx-auto px-4 sm:px-6 py-2">
+        {isLoading ? (
+          <CardSkeleton count={pageSize} />
+        ) : playlists.length > 0 ? (
+          <div
+            className="
+              grid gap-6
+              grid-cols-2
+              sm:grid-cols-3
+              md:grid-cols-4
+              lg:grid-cols-5
+              2xl:grid-cols-6
+              animate-in fade-in duration-500
+            "
+          >
+            {playlists.map((playlist: Playlist) => (
+              <PublicPlaylistCard key={playlist._id} playlist={playlist} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex justify-center py-20">
+            <MusicResult
+              status="empty"
+              title="No playlists found"
+              description="Try adjusting filters or create a new playlist."
+            />
+          </div>
+        )}
+      </section>
 
-      {/* --- PAGINATION --- */}
+      {/* ================= PAGINATION ================= */}
       {!isLoading && playlists.length > 0 && (
-        <div className="pt-4">
-          <Pagination
-            currentPage={meta.page}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            totalItems={totalItems}
-            itemsPerPage={pageSize}
-          />
-        </div>
+        <section>
+          {/* 🔥 FIX: Added mx-auto */}
+          <div className="container mx-auto px-4 sm:px-6 py-6 flex justify-center">
+            <Pagination
+              currentPage={meta.page}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              totalItems={totalItems}
+              itemsPerPage={pageSize}
+            />
+          </div>
+        </section>
       )}
     </div>
   );

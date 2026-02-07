@@ -6,14 +6,22 @@ import {
   keepPreviousData,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import albumApi from "../api/albumApi";
-import { type AlbumFilterParams } from "../types";
-import { albumKeys } from "@/features/album/utils/albumKeys";
 
+import albumApi from "../api/albumApi";
+import { albumKeys } from "@/features/album/utils/albumKeys";
+import { ApiErrorResponse } from "@/types"; // Import type lỗi chuẩn
+import type { AlbumFilterParams } from "../types";
+
+/**
+ * Hook quản lý toàn bộ logic Admin cho Album
+ * Bao gồm: Filter, Pagination, CRUD, Toggle Visibility
+ */
 export const useAlbumAdmin = (initialLimit = 10) => {
   const queryClient = useQueryClient();
 
-  // --- 1. LOCAL STATE (Đã bổ sung Sort, Type, Status) ---
+  // ==========================================
+  // 1. FILTER STATE
+  // ==========================================
   const [filterParams, setFilterParams] = useState<AlbumFilterParams>({
     page: 1,
     limit: initialLimit,
@@ -21,19 +29,29 @@ export const useAlbumAdmin = (initialLimit = 10) => {
     artistId: "",
     genreId: "",
     year: undefined,
-
-    // 🔥 MỚI THÊM:
-    sort: "newest", // Mặc định mới nhất
-    type: undefined, // Tất cả loại
-    isPublic: undefined, // Tất cả trạng thái
+    sort: "newest",
+    type: undefined,
+    isPublic: undefined,
   });
 
-  // --- 2. QUERY (Fetch Data) ---
-  const { data: queryData, isLoading: isFetching } = useQuery({
-    // Thêm filterParams vào queryKey để tự động refetch khi filter đổi
-    queryKey: [albumKeys.all, filterParams],
+  // ==========================================
+  // 2. QUERY DATA (FETCHING)
+  // ==========================================
+  const {
+    data: queryData,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    // 🔥 FIX KEY: ['albums', 'list', { filter: ... }]
+    queryKey: albumKeys.list(filterParams),
+
     queryFn: () => albumApi.getAll(filterParams),
+
+    // Giữ data cũ khi chuyển trang
     placeholderData: keepPreviousData,
+
+    // Cache data 1 phút
+    staleTime: 1000 * 60,
   });
 
   const albums = queryData?.data?.data || [];
@@ -44,43 +62,55 @@ export const useAlbumAdmin = (initialLimit = 10) => {
     totalPages: 1,
   };
 
-  // --- 3. MUTATIONS ---
+  // Helper xử lý lỗi (DRY)
+  const handleError = (err: unknown, defaultMessage: string) => {
+    const error = err as ApiErrorResponse;
+    const message = error.response?.data?.message || defaultMessage;
+    toast.error(message);
+  };
 
-  // Create & Update & Delete (Giữ nguyên logic cũ)
+  // ==========================================
+  // 3. MUTATIONS
+  // ==========================================
+
+  // --- A. CREATE ---
   const createMutation = useMutation({
     mutationFn: (data: any) => albumApi.create(data),
     onSuccess: () => {
       toast.success("Tạo Album mới thành công");
-      queryClient.invalidateQueries({ queryKey: ["admin-albums"] });
+      // Refresh danh sách
+      queryClient.invalidateQueries({ queryKey: albumKeys.lists() });
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || "Lỗi tạo album"),
+    onError: (err) => handleError(err, "Lỗi tạo album"),
   });
 
+  // --- B. UPDATE ---
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       albumApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success("Cập nhật Album thành công");
-      queryClient.invalidateQueries({ queryKey: ["admin-albums"] });
-      queryClient.invalidateQueries({ queryKey: ["album-detail"] });
+      // Refresh danh sách
+      queryClient.invalidateQueries({ queryKey: albumKeys.lists() });
+      // Refresh chi tiết (nếu đang xem)
+      queryClient.invalidateQueries({
+        queryKey: albumKeys.detail(variables.id),
+      }); // Lưu ý: id này phải là slug hoặc id tùy logic detail key
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || "Lỗi cập nhật"),
+    onError: (err) => handleError(err, "Lỗi cập nhật"),
   });
 
+  // --- C. DELETE ---
   const deleteMutation = useMutation({
     mutationFn: (id: string) => albumApi.delete(id),
     onSuccess: () => {
       toast.success("Đã xóa Album");
-      queryClient.invalidateQueries({ queryKey: ["admin-albums"] });
+      queryClient.invalidateQueries({ queryKey: albumKeys.lists() });
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || "Lỗi xóa album"),
+    onError: (err) => handleError(err, "Lỗi xóa album"),
   });
 
-  // 🔥 4. NEW MUTATION: Toggle Visibility (Bật/Tắt nhanh)
-  // Dùng để Admin click icon "Mắt" trên bảng mà không cần mở Modal Edit
+  // --- D. TOGGLE VISIBILITY (Quick Action) ---
   const toggleVisibilityMutation = useMutation({
     mutationFn: ({
       id,
@@ -92,60 +122,65 @@ export const useAlbumAdmin = (initialLimit = 10) => {
     onSuccess: (_, variables) => {
       const newStatus = !variables.currentStatus ? "Công khai" : "Riêng tư";
       toast.success(`Đã chuyển sang ${newStatus}`);
-      queryClient.invalidateQueries({ queryKey: albumKeys.all });
+      queryClient.invalidateQueries({ queryKey: albumKeys.lists() });
     },
-    onError: (err: any) => toast.error("Không thể thay đổi trạng thái"),
+    onError: (err) => handleError(err, "Không thể thay đổi trạng thái"),
   });
 
-  // --- 5. HANDLERS ---
+  // ==========================================
+  // 4. HANDLERS & WRAPPERS
+  // ==========================================
 
   const handlePageChange = (newPage: number) => {
     setFilterParams((prev) => ({ ...prev, page: newPage }));
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa Album này không?")) {
-      deleteMutation.mutate(id);
-    }
+  const handleFilterChange = (key: keyof AlbumFilterParams, value: any) => {
+    setFilterParams((prev) => ({ ...prev, [key]: value, page: 1 }));
   };
-
-  // Hàm wrapper tiện lợi
-  const createAlbum = (data: any, onSuccess: () => void) => {
-    createMutation.mutate(data, { onSuccess });
-  };
-
-  const updateAlbum = (id: string, data: any, onSuccess: () => void) => {
-    updateMutation.mutate({ id, data }, { onSuccess });
-  };
-
-  // Hàm mới cho UI gọi
-  const toggleVisibility = (id: string, currentStatus: boolean) => {
-    toggleVisibilityMutation.mutate({ id, currentStatus });
-  };
-
-  const isGlobalLoading =
-    isFetching ||
-    createMutation.isPending ||
-    updateMutation.isPending ||
-    deleteMutation.isPending ||
-    toggleVisibilityMutation.isPending;
 
   return {
+    // --- Data ---
     albums,
     meta,
-    isLoading: isGlobalLoading,
     filterParams,
 
-    // Setters
+    // --- Loading States ---
+    isLoading: isLoading || isFetching,
+
+    // Gom nhóm loading cho các hành động thay đổi dữ liệu
+    isMutating:
+      createMutation.isPending ||
+      updateMutation.isPending ||
+      deleteMutation.isPending ||
+      toggleVisibilityMutation.isPending,
+
+    // --- Actions ---
     setFilterParams,
-
-    // Actions
     handlePageChange,
-    handleDelete,
-    createAlbum,
-    updateAlbum,
-    toggleVisibility, // 🔥 Export hàm mới
+    handleFilterChange,
 
-    refresh: () => queryClient.invalidateQueries({ queryKey: albumKeys.all }),
+    // --- Wrapper Functions (UI gọi dễ dàng hơn) ---
+
+    // 1. Create: createAlbum(data, options)
+    createAlbum: (data: any, options?: any) =>
+      createMutation.mutate(data, options),
+
+    // 2. Update: updateAlbum(id, data, options) -> Tự động đóng gói {id, data}
+    updateAlbum: (id: string, data: any, options?: any) =>
+      updateMutation.mutate({ id, data }, options),
+
+    // 3. Delete
+    deleteAlbum: (id: string, options?: any) =>
+      deleteMutation.mutate(id, options),
+
+    // 4. Toggle Visibility
+    toggleVisibility: (id: string, currentStatus: boolean) =>
+      toggleVisibilityMutation.mutate({ id, currentStatus }),
+
+    // --- Async Variants ---
+    createAlbumAsync: createMutation.mutateAsync,
+    updateAlbumAsync: (id: string, data: any) =>
+      updateMutation.mutateAsync({ id, data }),
   };
 };

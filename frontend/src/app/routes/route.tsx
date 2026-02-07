@@ -13,7 +13,7 @@ import {
   BrowsePage,
   ClaimProfilePage,
   DashboardPage,
-  GenrePage,
+  GenreManagementPage,
   HomePage,
   NotFoundPage,
   ProfilePage,
@@ -27,6 +27,12 @@ import { GuestRoute } from "@/app/routes/GuestRoute";
 import { guestAuthRoutes, protectedAuthRoutes } from "@/features/auth/routes";
 import { ADMIN_PATHS, CLIENT_PATHS } from "@/config/paths";
 import PlaylistManagementPage from "@/pages/admin/PlaylistManagementPage";
+import {
+  becomeArtistRoutes,
+  verifyArtistAdminRoutes,
+} from "@/features/verification/routes";
+import { TopChartPage } from "@/pages/client/TopChartPage.tsx";
+import { GenreClientRoutes } from "@/features/genre/routes";
 
 export const router = createBrowserRouter([
   {
@@ -53,12 +59,14 @@ export const router = createBrowserRouter([
           { index: true, element: <HomePage /> },
           { path: CLIENT_PATHS.BROWSE, element: <BrowsePage /> },
           { path: CLIENT_PATHS.SEARCH, element: <SearchPage /> },
+          { path: CLIENT_PATHS.CHART_TOP, element: <TopChartPage /> },
 
           // Bung các route feature
+          ...GenreClientRoutes,
           ...playlistRoutes,
           ...artistRoutes,
           ...albumRoutes,
-
+          ...becomeArtistRoutes,
           // Protected Routes
           {
             element: <ProtectedRoute />,
@@ -108,7 +116,7 @@ export const router = createBrowserRouter([
               },
               {
                 path: ADMIN_PATHS.GENRES,
-                element: <GenrePage />,
+                element: <GenreManagementPage />,
               },
               {
                 path: ADMIN_PATHS.SETTINGS,
@@ -118,6 +126,7 @@ export const router = createBrowserRouter([
                 path: ADMIN_PATHS.PLAYLISTS,
                 element: <PlaylistManagementPage />,
               },
+              ...verifyArtistAdminRoutes,
             ],
           },
         ],

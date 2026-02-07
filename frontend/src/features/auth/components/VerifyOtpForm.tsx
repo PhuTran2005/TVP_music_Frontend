@@ -5,10 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 // Logic Imports
-import { useAppDispatch } from "@/store/store";
 import authApi from "@/features/auth/api/authApi";
 import { login } from "@/features/auth/slice/authSlice";
 import type { ApiErrorResponse } from "@/types";
+import { useAppDispatch } from "@/store/hooks";
 
 // ============================================================================
 // 1. COMPONENT BUTTON (UI)
@@ -98,7 +98,7 @@ const OtpInput: React.FC<{
               <div
                 className={cn(
                   "absolute -inset-0.5 bg-gradient-to-r from-indigo-500/40 to-purple-500/40 rounded-xl blur transition-opacity duration-300",
-                  isActive ? "opacity-100" : "opacity-0"
+                  isActive ? "opacity-100" : "opacity-0",
                 )}
               />
               <div
@@ -108,7 +108,8 @@ const OtpInput: React.FC<{
                   isFilled
                     ? "bg-white/10 border-indigo-500/50 text-white shadow-indigo-500/10"
                     : "bg-white/5 border-white/10 text-gray-400",
-                  isActive && "border-white/30 bg-white/10 ring-1 ring-white/20"
+                  isActive &&
+                    "border-white/30 bg-white/10 ring-1 ring-white/20",
                 )}
               >
                 {digit}
@@ -219,7 +220,7 @@ const VerifyOtpForm: React.FC<VerifyOtpFormProps> = ({ email }) => {
           login({
             accessToken: res.data.accessToken,
             user: res.data.user,
-          })
+          }),
         );
         toast.success("Xác thực thành công!");
         navigate("/");
@@ -267,7 +268,7 @@ const VerifyOtpForm: React.FC<VerifyOtpFormProps> = ({ email }) => {
     } catch (error: unknown) {
       const err = error as ApiErrorResponse;
       toast.error(
-        err.response?.data?.message || "Gửi lại thất bại. Thử lại sau."
+        err.response?.data?.message || "Gửi lại thất bại. Thử lại sau.",
       );
     } finally {
       setResendLoading(false);

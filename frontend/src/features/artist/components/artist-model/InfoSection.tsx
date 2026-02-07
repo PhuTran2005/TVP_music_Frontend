@@ -24,117 +24,131 @@ const InfoSection: React.FC<InfoSectionProps> = ({ form, artistToEdit }) => {
     formState: { errors },
   } = form;
 
+  // Style chung cho Label để đồng bộ và dễ đọc
+  const labelClass =
+    "text-xs font-bold uppercase tracking-wider text-foreground/80 flex items-center gap-2 mb-2";
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Name */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="name"
-            className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2"
-          >
-            <UserCircle2 className="size-3.5" /> Tên Nghệ sĩ{" "}
-            <span className="text-destructive">*</span>
+        <div className="space-y-1">
+          <Label htmlFor="name" className={labelClass}>
+            <UserCircle2 className="size-4 text-primary" /> Tên Nghệ sĩ{" "}
+            <span className="text-destructive text-sm">*</span>
           </Label>
           <Input
             id="name"
             {...register("name")}
             placeholder="VD: Sơn Tùng M-TP"
             className={cn(
-              errors.name && "border-destructive focus-visible:ring-destructive"
+              "h-10 bg-background border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-semibold",
+              errors.name &&
+                "border-destructive focus-visible:ring-destructive/20 bg-destructive/5"
             )}
           />
           {errors.name && (
-            <p className="text-[11px] font-medium text-destructive">
+            <p className="text-[11px] font-bold text-destructive mt-1 animate-in slide-in-from-left-1">
               {errors.name.message}
             </p>
           )}
         </div>
+
         {/* Nationality */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="nationality"
-            className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2"
-          >
-            <Languages className="size-3.5" /> Quốc tịch
+        <div className="space-y-1">
+          <Label htmlFor="nationality" className={labelClass}>
+            <Languages className="size-4 text-primary" /> Quốc tịch
           </Label>
-          <Controller
-            name="nationality"
-            control={form.control}
-            render={({ field }) => (
-              <NationalitySelector
-                autoDetect={!artistToEdit} // Chỉ auto-detect khi tạo mới
-                value={field.value}
-                onChange={field.onChange}
-              />
-            )}
-          />
+          <div className="bg-background rounded-lg shadow-sm">
+            <Controller
+              name="nationality"
+              control={form.control}
+              render={({ field }) => (
+                <NationalitySelector
+                  autoDetect={!artistToEdit}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </div>
         </div>
+
         {/* Aliases */}
-        <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <Fingerprint className="size-3.5" /> Tên gọi khác (Aliases)
+        <div className="space-y-1">
+          <Label className={labelClass}>
+            <Fingerprint className="size-4 text-primary" /> Tên gọi khác
+            (Aliases)
           </Label>
-          <Controller
-            name="aliases"
-            control={control}
-            render={({ field }) => (
-              <TagInput
-                value={field.value || []}
-                onChange={field.onChange}
-                placeholder="VD: MTP, Sky..."
-              />
-            )}
-          />
+          <div className="bg-background rounded-lg shadow-sm">
+            <Controller
+              name="aliases"
+              control={control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value || []}
+                  onChange={field.onChange}
+                  placeholder="Nhập tên gọi khác..."
+                  className="bg-background border-input min-h-[40px]"
+                />
+              )}
+            />
+          </div>
         </div>
-        <div className="space-y-2 relative z-[20]">
-          {" "}
-          {/* Đặt z-index cao cho container của UserSelector */}
-          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <UserCircle2 className="size-3.5" /> Liên kết tài khoản
+
+        {/* Linked User */}
+        <div className="space-y-1 relative z-[20]">
+          <Label className={labelClass}>
+            <UserCircle2 className="size-4 text-primary" /> Liên kết tài khoản
           </Label>
+          <div className="bg-background rounded-lg shadow-sm">
+            <Controller
+              name="userId"
+              control={control}
+              render={({ field, fieldState }) => (
+                <UserSelector
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={fieldState.error?.message}
+                  initialUsers={artistToEdit?.user}
+                />
+              )}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Genres */}
+      <div className="space-y-1">
+        <Label className={labelClass}>
+          Thể loại chính <span className="text-destructive text-sm">*</span>
+        </Label>
+        <div className="bg-background rounded-lg shadow-sm p-1 border border-border">
           <Controller
-            name="userId"
+            name="genreIds"
             control={control}
             render={({ field, fieldState }) => (
-              <UserSelector
+              <GenreSelector
                 value={field.value}
                 onChange={field.onChange}
                 error={fieldState.error?.message}
-                initialUsers={artistToEdit?.user}
+                required
               />
             )}
           />
         </div>
       </div>
 
-      {/* Genres */}
-      <Controller
-        name="genreIds"
-        control={control}
-        render={({ field, fieldState }) => (
-          <GenreSelector
-            value={field.value}
-            onChange={field.onChange}
-            error={fieldState.error?.message}
-            required
-          />
-        )}
-      />
-
       {/* Bio */}
-      <div className="space-y-2">
-        <Label
-          htmlFor="bio"
-          className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2"
-        >
-          <AlignLeft className="size-3.5" /> Tiểu sử
+      <div className="space-y-1">
+        <Label htmlFor="bio" className={labelClass}>
+          <AlignLeft className="size-4 text-primary" /> Tiểu sử
         </Label>
         <Textarea
           id="bio"
           {...register("bio")}
-          rows={4}
-          className="resize-none"
+          rows={5}
+          className="resize-none bg-background border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 text-sm leading-relaxed"
           placeholder="Giới thiệu về hành trình âm nhạc của nghệ sĩ..."
         />
       </div>

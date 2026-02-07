@@ -25,11 +25,12 @@ const PlaylistManagementPage = () => {
   const {
     playlists,
     meta,
-    isLoading,
+    isLoading, // Loading fetch
+    isMutating, // Loading create/update/delete (Dùng cái này cho button save)
     filterParams,
     setFilterParams,
     createPlaylist,
-    updatePlaylist,
+    updateMetadata,
     deletePlaylist,
     handlePageChange,
   } = usePlaylistAdmin(APP_CONFIG.PAGINATION_LIMIT || 12);
@@ -49,7 +50,7 @@ const PlaylistManagementPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [playlistToEdit, setPlaylistToEdit] = useState<Playlist | null>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(
-    null
+    null,
   );
 
   // --- HANDLERS ---
@@ -63,26 +64,42 @@ const PlaylistManagementPage = () => {
     setIsModalOpen(true);
   };
 
+  // 🔥 DELETE HANDLER (Đã chuẩn)
   const handleConfirmDelete = () => {
     if (playlistToDelete) {
-      deletePlaylist(playlistToDelete._id, () => setPlaylistToDelete(null));
+      // Gọi trực tiếp: id, options
+      deletePlaylist(playlistToDelete._id, {
+        onSuccess: () => setPlaylistToDelete(null),
+      });
     }
   };
 
-  const handleSubmitForm = (data: any) => {
+  // 🔥 SUBMIT HANDLER (Đã sửa lại cho khớp với Hook mới)
+  const handleSubmitForm = (formData: any) => {
     if (playlistToEdit) {
-      updatePlaylist(playlistToEdit._id, data, () => setIsModalOpen(false));
+      // ✅ FIX: Truyền 3 tham số rời rạc: ID, Data, Options
+      updateMetadata(
+        playlistToEdit._id, // Arg 1: ID
+        formData, // Arg 2: Data
+        {
+          // Arg 3: Options
+          onSuccess: () => setIsModalOpen(false),
+        },
+      );
     } else {
-      createPlaylist(data, () => setIsModalOpen(false));
+      // ✅ Create vẫn giữ nguyên: Data, Options
+      createPlaylist(formData, {
+        onSuccess: () => setIsModalOpen(false),
+      });
     }
   };
-  console.log(playlists);
+
   const totalPages = meta.totalPages || 1;
   const totalItems = meta.totalItems || 0;
   const pageSize = meta.pageSize || APP_CONFIG.PAGINATION_LIMIT;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-12">
       {/* --- HEADER --- */}
       <PageHeader
         title="Playlists Management"
@@ -90,26 +107,22 @@ const PlaylistManagementPage = () => {
         action={
           <Button
             onClick={handleOpenCreate}
-            className="shadow-lg shadow-primary/20"
+            className="shadow-md bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6"
           >
-            <Plus className="w-4 h-4 mr-2" /> Create System Playlist
+            <Plus className="w-4 h-4 mr-2" /> New Playlist
           </Button>
         }
       />
 
       {/* --- FILTER --- */}
-      <PlaylistFilter
-        params={filterParams}
-        setParams={setFilterParams}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-      />
+      <PlaylistFilter params={filterParams} setParams={setFilterParams} />
 
       {/* --- CONTENT --- */}
-      {isLoading ? (
-        <CardSkeleton count={8} />
+      {/* Chỉ hiện Skeleton khi đang fetch dữ liệu ban đầu, tránh nháy khi mutate */}
+      {isLoading && playlists.length === 0 ? (
+        <CardSkeleton count={pageSize} />
       ) : playlists.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 animate-in fade-in duration-500">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 animate-in fade-in duration-500">
           {playlists.map((playlist: Playlist) => (
             <PlaylistCard
               key={playlist._id}
@@ -120,7 +133,7 @@ const PlaylistManagementPage = () => {
           ))}
         </div>
       ) : (
-        <div className="py-12">
+        <div className="py-16 bg-muted/5 rounded-xl border border-dashed border-border">
           <MusicResult
             status="empty"
             title="No playlists found"
@@ -130,8 +143,8 @@ const PlaylistManagementPage = () => {
       )}
 
       {/* --- PAGINATION --- */}
-      {!isLoading && playlists.length > 0 && (
-        <div className="pt-4">
+      {playlists.length > 0 && (
+        <div className="pt-6 border-t border-border">
           <Pagination
             currentPage={meta.page}
             totalPages={totalPages}
@@ -148,7 +161,8 @@ const PlaylistManagementPage = () => {
         onClose={() => setIsModalOpen(false)}
         playlistToEdit={playlistToEdit}
         onSubmit={handleSubmitForm}
-        isPending={isLoading}
+        // Sử dụng isMutating để chỉ loading nút Save chứ không loading cả trang
+        isPending={isMutating}
       />
 
       <ConfirmationModal
@@ -156,35 +170,37 @@ const PlaylistManagementPage = () => {
         onCancel={() => setPlaylistToDelete(null)}
         onConfirm={handleConfirmDelete}
         title="Delete Playlist?"
+        // Sử dụng isMutating để disable nút xóa khi đang chạy
+        isLoading={isMutating}
         description={
-          <div className="space-y-3">
-            <p>
+          <div className="space-y-4">
+            <p className="text-sm text-foreground/80">
               Are you sure you want to delete{" "}
-              <strong className="text-foreground">
+              <strong className="text-foreground text-base">
                 {playlistToDelete?.title}
               </strong>
               ?
             </p>
             {playlistToDelete?.isSystem ? (
-              <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 flex items-start gap-2">
-                <span className="text-base">⚠️</span>
+              <div className="text-xs font-medium text-amber-700 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800/50 flex items-start gap-3">
+                <span className="text-lg leading-none">⚠️</span>
                 <p>
                   This is a <strong>System Playlist</strong>. Deleting it will
-                  remove it from all users' homepages.
+                  remove it from the homepage of all users.
                 </p>
               </div>
             ) : (
-              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg border border-border flex items-start gap-2">
-                <span className="text-base">ℹ️</span>
+              <div className="text-xs font-medium text-muted-foreground bg-muted/50 p-3 rounded-lg border border-border flex items-start gap-3">
+                <span className="text-lg leading-none">ℹ️</span>
                 <p>
-                  This is a User Playlist. Usually, only delete if it violates
-                  content policies.
+                  This is a User Playlist. Typically, you only delete this if it
+                  violates platform policies.
                 </p>
               </div>
             )}
           </div>
         }
-        confirmLabel="Delete Playlist"
+        confirmLabel="Yes, Delete"
         isDestructive
       />
     </div>

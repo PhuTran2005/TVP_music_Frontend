@@ -12,6 +12,7 @@ interface ConfirmationModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   isDestructive?: boolean;
+  isLoading?: boolean;
 }
 
 const ConfirmationModal = ({
@@ -23,6 +24,7 @@ const ConfirmationModal = ({
   onConfirm,
   onCancel,
   isDestructive = false,
+  isLoading = false,
 }: ConfirmationModalProps) => {
   // UX: Khóa cuộn trang & Phím tắt ESC
   useEffect(() => {
@@ -88,6 +90,7 @@ const ConfirmationModal = ({
               {cancelLabel}
             </Button>
             <Button
+              loading={isLoading}
               variant={isDestructive ? "destructive" : "default"}
               onClick={onConfirm}
               className="w-full sm:w-auto shadow-sm"
@@ -98,7 +101,7 @@ const ConfirmationModal = ({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 

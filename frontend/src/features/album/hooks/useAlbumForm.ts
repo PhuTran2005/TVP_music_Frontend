@@ -1,105 +1,58 @@
-import { useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  albumSchema,
-  type AlbumFormValues,
-} from "@/features/album/schemas/album.schema";
+import { albumSchema, type AlbumFormValues } from "../schemas/album.schema";
 import type { Album } from "@/features/album/types";
+import { mapEntityToForm } from "../utils/formMapper";
+import { buildAlbumPayload } from "../utils/payloadBuilder";
 
 interface UseAlbumFormProps {
-  isOpen: boolean;
   albumToEdit?: Album | null;
+  onSubmit: (formData: FormData) => Promise<void>; // Inject hàm gọi API vào
 }
 
-export const useAlbumForm = ({ isOpen, albumToEdit }: UseAlbumFormProps) => {
+export const useAlbumForm = ({ albumToEdit, onSubmit }: UseAlbumFormProps) => {
+  const defaultValues = useMemo(() => {
+    return mapEntityToForm(albumToEdit);
+  }, [albumToEdit]);
+
+  // 2. Init Form
   const form = useForm<AlbumFormValues>({
     resolver: zodResolver(albumSchema),
-    defaultValues: {
-      title: "",
-      type: "album",
-      description: "",
-      releaseDate: new Date().toISOString().split("T")[0],
-      isPublic: false,
-      artist: "",
-      genreIds: [],
-      coverImage: null,
-      label: "",
-      copyright: "",
-      upc: "",
-      themeColor: "#1db954",
-
-      // 🔥 FIX 1: Default phải là mảng rỗng [], không phải chuỗi ""
-      tags: [],
-    },
+    defaultValues,
+    mode: "onSubmit",
   });
 
   useEffect(() => {
-    if (isOpen) {
-      if (albumToEdit) {
-        // --- MAP DATA FOR EDIT ---
-        const artistId =
-          albumToEdit.artist && typeof albumToEdit.artist === "object"
-            ? (albumToEdit.artist as any)._id
-            : albumToEdit.artist;
+    form.reset(defaultValues);
+  }, [defaultValues, form]);
 
-        const genreIds = Array.isArray(albumToEdit.genres)
-          ? albumToEdit.genres.map((g: any) =>
-              typeof g === "object" ? g._id : g
-            )
-          : [];
+  // 4. Custom Submit Handler
+  const handleSubmit = form.handleSubmit(async (values) => {
+    const { dirtyFields } = form.formState;
+    const isEditMode = !!albumToEdit;
 
-        // Map Tags: Đảm bảo luôn là mảng
-        const tags = Array.isArray(albumToEdit.tags) ? albumToEdit.tags : [];
+    // TỐI ƯU BĂNG THÔNG:
+    // Nếu đang Edit mà không sửa gì cả (và không up ảnh mới) -> Return luôn
+    const hasFile = values.coverImage instanceof File;
+    const hasChanges = Object.keys(dirtyFields).length > 0;
 
-        // Format Date
-        let formattedDate = "";
-        try {
-          formattedDate = albumToEdit.releaseDate
-            ? new Date(albumToEdit.releaseDate).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0];
-        } catch {
-          formattedDate = new Date().toISOString().split("T")[0];
-        }
-
-        form.reset({
-          title: albumToEdit.title,
-          type: albumToEdit.type || "album",
-          description: albumToEdit.description || "",
-          releaseDate: formattedDate,
-          isPublic: albumToEdit.isPublic,
-          artist: artistId || "",
-          genreIds: genreIds,
-          coverImage: albumToEdit.coverImage,
-          label: albumToEdit.label || "",
-          copyright: albumToEdit.copyright || "",
-          upc: albumToEdit.upc || "",
-          themeColor: albumToEdit.themeColor || "#1db954",
-
-          tags: tags, // Đã chuẩn mảng
-        });
-      } else {
-        // --- RESET FOR CREATE ---
-        form.reset({
-          title: "",
-          type: "album",
-          description: "",
-          releaseDate: new Date().toISOString().split("T")[0],
-          isPublic: false,
-          artist: "",
-          genreIds: [],
-          coverImage: null,
-          label: "",
-          copyright: "",
-          upc: "",
-          themeColor: "#1db954",
-
-          // 🔥 FIX 2: Reset về mảng rỗng
-          tags: [],
-        });
-      }
+    if (isEditMode && !hasChanges && !hasFile) {
+      console.log("⚠️ No changes detected, skipping API call.");
+      return;
     }
-  }, [isOpen, albumToEdit, form]);
 
-  return { form };
+    // Build Payload thông minh (chỉ chứa data thay đổi)
+    const payload = buildAlbumPayload(values, dirtyFields, isEditMode);
+
+    
+    await onSubmit(payload);
+  });
+
+  return {
+    form,
+    handleSubmit,
+    isSubmitting: form.formState.isSubmitting,
+    isDirty: form.formState.isDirty,
+  };
 };

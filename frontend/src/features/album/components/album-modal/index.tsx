@@ -9,18 +9,18 @@ import GeneralInfoSection from "./GeneralInfoSection";
 import RelationSection from "./RelationSection";
 import LegalInfoSection from "./LegalInfoSection";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 // Logic
 import { useAlbumForm } from "@/features/album/hooks/useAlbumForm";
-import type { AlbumFormValues } from "@/features/album/schemas/album.schema";
 import { Album } from "@/features/album/types";
+import { Form } from "@/components/ui/form"; // Đảm bảo import Form từ shadcn
 
 interface AlbumModalProps {
   isOpen: boolean;
   onClose: () => void;
   albumToEdit?: Album | null;
-  onSubmit: (data: AlbumFormValues) => void;
+  // 🔥 UPDATE: Type đổi thành FormData để khớp với hook mới
+  onSubmit: (data: FormData) => Promise<void>;
   isPending: boolean;
 }
 
@@ -31,7 +31,15 @@ const AlbumModal: React.FC<AlbumModalProps> = ({
   onSubmit,
   isPending,
 }) => {
-  const { form } = useAlbumForm({ isOpen, albumToEdit });
+  const {
+    form,
+    handleSubmit,
+    isSubmitting: isFormSubmitting, // Lấy trạng thái submitting nội bộ của form
+  } = useAlbumForm({
+    albumToEdit,
+    onSubmit,
+  });
+
   const isPublic = form.watch("isPublic");
 
   // Lock scroll
@@ -47,110 +55,133 @@ const AlbumModal: React.FC<AlbumModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
+      {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
       />
 
       {/* Container */}
-      <div className="relative z-10 w-full max-w-5xl bg-card border border-border rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 overflow-hidden">
+      <div className="relative z-10 w-full max-w-5xl bg-background border border-border rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 overflow-hidden ring-1 ring-white/10">
         {/* --- HEADER --- */}
-        <div className="shrink-0 px-6 py-4 border-b flex justify-between items-center bg-muted/10">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+        <div className="shrink-0 px-6 py-4 border-b border-border bg-background flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/20 shadow-sm">
               <Disc3 className="size-5" />
             </div>
             <div className="space-y-0.5">
-              <h3 className="text-lg font-semibold leading-none tracking-tight">
+              <h3 className="text-lg font-bold leading-none tracking-tight text-foreground">
                 {albumToEdit ? "Edit Album Metadata" : "Create New Album"}
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground font-medium">
                 {albumToEdit
-                  ? `Updating: ${albumToEdit.title}`
-                  : "Fill in the details to create a new album release."}
+                  ? `Ref: ${albumToEdit.title}`
+                  : "Studio Release Manager"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Public Toggle Badge */}
-            <Badge
-              variant={isPublic ? "outline" : "secondary"}
+          <div className="flex items-center gap-3">
+            <div
               className={cn(
-                "cursor-pointer hidden sm:flex gap-1.5 py-1",
+                "hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer select-none",
                 isPublic
-                  ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/5"
-                  : "text-muted-foreground"
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                  : "bg-secondary border-border text-muted-foreground hover:bg-secondary/80",
               )}
-              onClick={() => form.setValue("isPublic", !isPublic)}
+              onClick={() =>
+                form.setValue("isPublic", !isPublic, { shouldDirty: true })
+              }
             >
               {isPublic ? (
-                <Globe className="size-3" />
+                <Globe className="size-3.5" />
               ) : (
-                <Lock className="size-3" />
+                <Lock className="size-3.5" />
               )}
-              {isPublic ? "Public" : "Private"}
-            </Badge>
+              <span className="text-xs font-bold uppercase tracking-wide">
+                {isPublic ? "Public" : "Private"}
+              </span>
+            </div>
 
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="h-8 w-8 rounded-full"
+              className="h-9 w-9 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
             >
-              <X className="size-4" />
+              <X className="size-5" />
             </Button>
           </div>
         </div>
 
         {/* --- BODY --- */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-          <form
-            id="album-form"
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col lg:flex-row gap-8"
-          >
-            {/* LEFT COLUMN: Visuals & Relations (35%) */}
-            <div className="w-full lg:w-[35%] shrink-0 space-y-6">
-              <CoverUpload form={form} />
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar bg-muted/20">
+          {/* Bọc Form Provider của Shadcn/RHF */}
+          <Form {...form}>
+            <form
+              id="album-form"
+              // 🔥 UPDATE: Dùng handleSubmit từ hook (đã xử lý FormData)
+              // Không dùng form.handleSubmit(onSubmit) nữa
+              onSubmit={handleSubmit}
+              className="flex flex-col lg:flex-row gap-6"
+            >
+              {/* LEFT COLUMN: Visuals & Relations */}
+              <div className="w-full lg:w-[35%] shrink-0 space-y-6">
+                <div className="bg-background border border-border rounded-xl p-4 shadow-sm">
+                  <CoverUpload form={form} />
+                </div>
 
-              <div className="bg-muted/30 p-4 rounded-lg border border-border">
-                <RelationSection form={form} />
+                <div className="bg-background border border-border rounded-xl p-5 shadow-sm space-y-4">
+                  <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-2">
+                    Associations
+                  </h4>
+                  <RelationSection form={form} />
+                </div>
               </div>
-            </div>
 
-            {/* RIGHT COLUMN: Info & Legal (65%) */}
-            <div className="w-full lg:w-[65%] space-y-8">
-              <GeneralInfoSection form={form} />
-              <div className="border-t pt-6">
-                <LegalInfoSection form={form} />
+              {/* RIGHT COLUMN: Info & Legal */}
+              <div className="w-full lg:w-[65%] space-y-6">
+                <div className="bg-background border border-border rounded-xl p-6 shadow-sm">
+                  <GeneralInfoSection form={form} />
+                </div>
+
+                <div className="bg-background border border-border rounded-xl p-6 shadow-sm">
+                  <LegalInfoSection form={form} />
+                </div>
               </div>
-            </div>
-          </form>
+            </form>
+          </Form>
         </div>
 
         {/* --- FOOTER --- */}
-        <div className="shrink-0 px-6 py-4 border-t bg-muted/10 flex justify-end gap-3">
-          <Button variant="outline" type="button" onClick={onClose}>
+        <div className="shrink-0 px-6 py-4 border-t border-border bg-background flex justify-end gap-3 z-20">
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={onClose}
+            className="font-semibold text-muted-foreground hover:text-foreground"
+            disabled={isPending || isFormSubmitting}
+          >
             Cancel
           </Button>
           <Button
             type="submit"
             form="album-form"
-            disabled={isPending}
-            className="gap-2 shadow-sm"
+            // Kết hợp cả trạng thái từ Parent (API mutation) và Internal Form
+            disabled={isPending || isFormSubmitting}
+            className="gap-2 shadow-md hover:shadow-lg transition-all font-bold px-6"
           >
-            {isPending ? (
+            {isPending || isFormSubmitting ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <Save className="size-4" />
             )}
-            {albumToEdit ? "Save Changes" : "Create Album"}
+            {albumToEdit ? "Save Changes" : "Publish Album"}
           </Button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 

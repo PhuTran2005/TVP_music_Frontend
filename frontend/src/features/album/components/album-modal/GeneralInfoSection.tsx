@@ -1,136 +1,92 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { type UseFormReturn } from "react-hook-form";
-import { Globe, Lock } from "lucide-react";
-import { type AlbumFormValues } from "@/features/album/schemas/album.schema";
-import { Input } from "@/components/ui/input";
+import { Image as ImageIcon, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import type { AlbumFormValues } from "@/features/album/schemas/album.schema";
 
-import { cn } from "@/lib/utils";
-
-interface GeneralInfoSectionProps {
+interface CoverUploadProps {
   form: UseFormReturn<AlbumFormValues>;
 }
 
-const GeneralInfoSection: React.FC<GeneralInfoSectionProps> = ({ form }) => {
-  const {
-    register,
-    watch,
-    setValue,
-    formState: { errors },
-  } = form;
-  const themeColor = watch("themeColor");
-  const isPublic = watch("isPublic");
+const CoverUpload: React.FC<CoverUploadProps> = ({ form }) => {
+  const { watch, setValue } = form;
+  const coverValue = watch("coverImage");
+  const [preview, setPreview] = useState<string | null>(null);
+
+  // Auto generate preview URL
+  useEffect(() => {
+    if (coverValue instanceof File) {
+      const url = URL.createObjectURL(coverValue);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } else if (typeof coverValue === "string" && coverValue.length > 0) {
+      setPreview(coverValue);
+    } else {
+      setPreview(null);
+    }
+  }, [coverValue]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // shouldDirty: true -> Để payloadBuilder biết field này đã thay đổi
+      setValue("coverImage", file, { shouldValidate: true, shouldDirty: true });
+    }
+  };
 
   return (
-    <div className="space-y-5 animate-in slide-in-from-right-2 duration-500">
-      {/* Title */}
-      <div className="space-y-2">
-        <Label className="flex items-center gap-1.5">
-          Title <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          {...register("title")}
-          placeholder="e.g. Midnight Memories"
-          className={cn(
-            errors.title && "border-destructive focus-visible:ring-destructive"
-          )}
+    <div className="space-y-3">
+      <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+        Album Cover
+      </Label>
+      <div className="relative group aspect-square w-full rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/50 transition-all overflow-hidden bg-muted/30 flex items-center justify-center">
+        {preview ? (
+          <img
+            src={preview}
+            alt="Cover Preview"
+            className="w-full h-full object-cover transition-opacity group-hover:opacity-75"
+          />
+        ) : (
+          <div className="text-center p-4 flex flex-col items-center">
+            <div className="p-3 bg-background rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
+              <ImageIcon className="size-6 text-muted-foreground" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              Click to upload
+            </span>
+          </div>
+        )}
+
+        {/* Input ẩn phủ lên trên */}
+        <input
+          type="file"
+          accept="image/*"
+          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+          onChange={handleFileChange}
         />
-        {errors.title && (
-          <p className="text-[10px] text-destructive font-medium">
-            {errors.title.message}
-          </p>
+
+        {/* Nút xóa ảnh */}
+        {preview && (
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon"
+            className="absolute top-2 right-2 z-20 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+            onClick={(e) => {
+              e.stopPropagation();
+              setValue("coverImage", null, { shouldDirty: true });
+            }}
+          >
+            <X className="size-3.5" />
+          </Button>
         )}
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Type (Native Select for simplicity or Shadcn Select) */}
-        <div className="space-y-2">
-          <Label>Type</Label>
-          <select
-            {...register("type")}
-            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="album">Album</option>
-            <option value="single">Single</option>
-            <option value="ep">EP</option>
-            <option value="compilation">Compilation</option>
-          </select>
-        </div>
-
-        {/* Release Date */}
-        <div className="space-y-2">
-          <Label>Release Date</Label>
-          <Input type="date" {...register("releaseDate")} />
-        </div>
-      </div>
-
-      {/* Status & Color */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Visibility Status</Label>
-          <div
-            onClick={() =>
-              setValue("isPublic", !isPublic, { shouldDirty: true })
-            }
-            className={cn(
-              "flex items-center justify-between px-3 h-10 rounded-md border cursor-pointer transition-all select-none hover:bg-accent",
-              isPublic
-                ? "border-emerald-500/30 bg-emerald-500/5"
-                : "bg-background"
-            )}
-          >
-            <span
-              className={cn(
-                "text-sm font-medium",
-                isPublic ? "text-emerald-600" : "text-muted-foreground"
-              )}
-            >
-              {isPublic ? "Public" : "Private"}
-            </span>
-            {isPublic ? (
-              <Globe className="size-4 text-emerald-500" />
-            ) : (
-              <Lock className="size-4 text-muted-foreground" />
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Theme Color</Label>
-          <div className="flex gap-2">
-            <div
-              className="size-10 rounded-md border shadow-sm shrink-0"
-              style={{ backgroundColor: themeColor || "#000000" }}
-            />
-            <div className="flex-1 relative">
-              <Input
-                type="color"
-                {...register("themeColor")}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-              <Input
-                value={themeColor}
-                readOnly
-                className="font-mono text-xs uppercase"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Description */}
-      <div className="space-y-2">
-        <Label>Description</Label>
-        <Textarea
-          {...register("description")}
-          rows={4}
-          placeholder="Brief description about this album..."
-          className="resize-none"
-        />
-      </div>
+      <p className="text-[10px] text-muted-foreground text-center">
+        Recommended: 1000x1000px. Max 5MB.
+      </p>
     </div>
   );
 };
 
-export default GeneralInfoSection;
+export default CoverUpload;

@@ -1,5 +1,5 @@
+import { useAppSelector } from "@/store/hooks";
 import { Navigate, Outlet } from "react-router-dom";
-import { useAppSelector } from "@/store/store";
 
 export const GuestRoute = () => {
   const { user } = useAppSelector((state) => state.auth);

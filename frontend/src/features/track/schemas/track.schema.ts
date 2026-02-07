@@ -60,4 +60,38 @@ export const trackSchema = z.object({
   duration: z.number().default(0), // Frontend tính bằng Audio Context
 });
 
+// Import lại các rule validate cơ bản nếu bạn đã tách file, hoặc định nghĩa lại cho gọn
+const genreIdsSchema = z
+  .array(z.string())
+  .min(1, "Vui lòng chọn ít nhất 1 thể loại");
+const tagsSchema = z.array(z.string());
+
+export const bulkTrackSchema = z.object({
+  // --- METADATA ---
+  // Optional hết để nếu không gửi lên -> Backend giữ nguyên giá trị cũ
+
+  genreIds: genreIdsSchema.optional(),
+
+  tags: tagsSchema.optional(),
+
+  releaseDate: z.string().optional(), // ISO String
+
+  isPublic: z.boolean().optional(),
+
+  isExplicit: z.boolean().optional(),
+
+  // --- RELATIONSHIPS ---
+  // nullable() để cho phép hành động "Gỡ bài hát khỏi Album"
+  albumId: z.string().nullable().optional(),
+
+  // Artist chính thường không sửa hàng loạt vì ảnh hưởng quyền sở hữu,
+  // nhưng Featuring Artist thì có thể (vd: thêm producer cho cả album)
+  featuringArtistIds: z.array(z.string()).optional(),
+
+  // --- MEDIA ---
+  // Cho phép đổi Cover Image cho cả loạt bài (Ví dụ: Đổi cover cho Single)
+  coverImage: z.union([z.instanceof(File), z.string(), z.null()]).optional(),
+});
+
+export type BulkTrackFormValues = z.infer<typeof bulkTrackSchema>;
 export type TrackFormValues = z.infer<typeof trackSchema>;

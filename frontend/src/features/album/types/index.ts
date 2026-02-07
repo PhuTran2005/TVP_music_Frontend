@@ -1,10 +1,7 @@
 import type { Artist } from "@/features/artist/types";
 import type { Genre } from "@/features/genre/types";
-import { Track } from "hls.js";
+import { Track } from "@/features/track/types";
 
-// ==========================================
-// 1. ENTITY (Dữ liệu hiển thị từ API)
-// ==========================================
 export interface Album {
   _id: string;
   title: string;
@@ -48,12 +45,9 @@ export interface AlbumFormInput {
   type: "album" | "single" | "ep" | "compilation";
   description?: string;
 
-  // 🔥 Quan trọng: Khi upload, coverImage là File. Khi edit không đổi ảnh, nó là string (URL) hoặc null.
   coverImage: File | string | null;
 
   themeColor: string;
-
-  // Relations: Gửi lên ID (string), không gửi cả object
   artist: string;
   genreIds: string[];
 
@@ -64,7 +58,7 @@ export interface AlbumFormInput {
   label?: string;
   copyright?: string;
   upc?: string;
-  tags?: string; // Form nhập string "tag1, tag2", sau đó convert thành mảng khi submit
+  tags?: string;
 }
 
 // Input dùng cho hàm Create (thường giống FormInput)
@@ -90,19 +84,4 @@ export interface AlbumFilterParams {
   type?: "album" | "single" | "ep" | "compilation" | "all";
   sort?: "newest" | "oldest" | "popular" | "a-z"; // Thêm sort
   isPublic?: boolean; // Admin có thể lọc theo trạng thái
-}
-
-// Response chuẩn từ Backend
-export interface AlbumResponse {
-  success: boolean;
-  data: {
-    data: Album[];
-    meta: {
-      totalItems: number; // Backend thường trả về totalItems
-      total: number; // Hoặc total (tùy convention team bạn)
-      page: number;
-      limit: number;
-      totalPages: number;
-    };
-  };
 }

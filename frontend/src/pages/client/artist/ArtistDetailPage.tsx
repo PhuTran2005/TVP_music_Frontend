@@ -38,6 +38,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useArtistDetail } from "@/features/artist/hooks";
+import { TrackList } from "@/features/track/components/TrackList";
+import { Album } from "@/features/album/types";
 
 const ArtistDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -48,7 +50,7 @@ const ArtistDetailPage = () => {
   const artist = res?.data?.artist;
   const topTracks = res?.data?.topTracks || [];
   const albums = res?.data?.albums || [];
-
+  console.log(albums);
   const themeColor = useMemo(() => artist?.themeColor || "#7c3aed", [artist]);
 
   // Fluid Typography cho tên nghệ sĩ
@@ -223,49 +225,7 @@ const ArtistDetailPage = () => {
                   </Badge>
                 )}
               </div>
-
-              {topTracks.length > 0 ? (
-                <div className="space-y-1">
-                  {topTracks.slice(0, 5).map((track: any, idx: number) => (
-                    <div
-                      key={track._id}
-                      className="flex items-center gap-3 sm:gap-6 p-2 sm:p-3 rounded-2xl active:bg-muted/80 sm:hover:bg-muted transition-all group cursor-pointer border border-transparent hover:border-border/40"
-                    >
-                      <span className="w-6 text-center text-muted-foreground font-mono text-sm group-hover:text-primary font-bold">
-                        {idx + 1}
-                      </span>
-                      <div className="size-11 sm:size-12 rounded-xl overflow-hidden shadow-md shrink-0 border border-border/10">
-                        <img
-                          src={track.coverImage}
-                          className="size-full object-cover"
-                          alt=""
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold truncate text-[15px] sm:text-[17px] group-hover:text-primary transition-colors leading-tight tracking-tight">
-                          {track.title}
-                        </h4>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 font-bold opacity-60">
-                          {new Intl.NumberFormat().format(track.playCount)}{" "}
-                          streams
-                        </p>
-                      </div>
-                      <span className="hidden sm:block text-[12px] font-mono text-muted-foreground opacity-60 mr-4 font-bold">
-                        {formatDuration(track.duration)}
-                      </span>
-                      <button className="sm:opacity-0 group-hover:opacity-100 p-2 hover:bg-muted rounded-full transition-all text-muted-foreground">
-                        <MoreHorizontal className="size-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptySection
-                  icon={<ListMusic />}
-                  title="No popular hits yet"
-                  message="Nghệ sĩ này chưa có bài hát nổi bật nào."
-                />
-              )}
+              <TrackList tracks={topTracks} isLoading={isLoading} />
             </section>
 
             {/* ARTIST GALLERY: Hidden if empty */}
@@ -314,7 +274,7 @@ const ArtistDetailPage = () => {
 
               {albums.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
-                  {albums.map((album: any) => (
+                  {albums.map((album: Album) => (
                     <PublicAlbumCard key={album._id} album={album} />
                   ))}
                 </div>

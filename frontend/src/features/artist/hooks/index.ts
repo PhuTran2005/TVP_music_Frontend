@@ -1,76 +1,68 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import artistApi from "../api/artistApi";
+import { useState } from "react";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
+
+import artistApi from "../api/artistApi";
+import { artistKeys } from "@/features/artist/utils/artistKeys";
 import type { ArtistFilterParams } from "../types";
 import type { ArtistFormValues } from "@/features/artist/schemas/artist.schema";
-import { artistKeys } from "@/features/artist/utils/artistKeys";
+import { handleError } from "@/utils/handleError";
 
-// ==========================================
-// 1. PUBLIC HOOKS (Dùng cho trang Home/Detail)
-// ==========================================
-
-export const usePublicArtists = (params: ArtistFilterParams) => {
-  return useQuery({
-    queryKey: ["public-artists", params],
-    queryFn: () => artistApi.getAll(params),
-    placeholderData: (prev) => prev,
-  });
-};
-export const useSpotlightArtist = (limit = 10) => {
-  return useQuery({
-    queryKey: artistKeys.list({ sort: "popular" }),
-    queryFn: async () => {
-      const res = await artistApi.getAll({
-        page: 1,
-        limit,
-        sort: "popular",
-      });
-      return res.data.data;
-    },
-    staleTime: 10 * 60 * 1000,
-  });
-};
-export const useArtistDetail = (slugOrId: string) => {
-  return useQuery({
-    queryKey: [artistKeys.detail, slugOrId],
-    queryFn: () => artistApi.getDetail(slugOrId),
-    enabled: !!slugOrId, // Chỉ chạy khi có slug
-  });
-};
-
-// ==========================================
-// 2. ADMIN HOOKS (Dùng cho CMS)
-// ==========================================
-
-export const useAdminArtists = (params: ArtistFilterParams) => {
-  return useQuery({
-    queryKey: [artistKeys.all, params],
-    queryFn: () => artistApi.getAll(params), // Admin dùng chung API get list nhưng có param active/inactive
-  });
-};
-export const useClientGetArtists = (params: ArtistFilterParams) => {
-  return useQuery({
-    queryKey: [artistKeys.all, params],
-    queryFn: () => artistApi.getAll(params), // Admin dùng chung API get list nhưng có param active/inactive
-  });
-};
-
-export const useAdminCreateArtist = () => {
+export const useArtistAdmin = (initialLimit = 10) => {
   const queryClient = useQueryClient();
-  return useMutation({
+
+  // ==========================================
+  // 1. FILTER STATE
+  // ==========================================
+  const [filterParams, setFilterParams] = useState<ArtistFilterParams>({
+    page: 1,
+    limit: initialLimit,
+    keyword: "",
+    sort: "newest",
+    nationality: undefined,
+    isVerified: undefined,
+    isActive: undefined,
+  });
+
+  // ==========================================
+  // 2. QUERY DATA
+  // ==========================================
+  const { data, isLoading, isFetching, isError } = useQuery({
+    queryKey: artistKeys.list(filterParams),
+    queryFn: () => artistApi.getAll(filterParams),
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60,
+  });
+
+  const artists = data?.data?.data || [];
+  const meta = data?.data?.meta || {
+    totalItems: 0,
+    page: 1,
+    pageSize: initialLimit,
+    totalPages: 1,
+  };
+
+  // ==========================================
+  // 3. MUTATIONS
+  // ==========================================
+
+  // --- CREATE ---
+  const createMutation = useMutation({
     mutationFn: (data: ArtistFormValues) => artistApi.adminCreate(data),
     onSuccess: () => {
       toast.success("Tạo nghệ sĩ mới thành công");
-      queryClient.invalidateQueries({ queryKey: [artistKeys.all] });
+      queryClient.invalidateQueries({ queryKey: artistKeys.lists() });
     },
-    onError: (err: any) =>
-      toast.error(err.response?.data?.message || "Lỗi tạo nghệ sĩ"),
+    onError: (err) => handleError(err, "Lỗi tạo nghệ sĩ"),
   });
-};
 
-export const useAdminUpdateArtist = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
+  // --- UPDATE ---
+  const updateMutation = useMutation({
     mutationFn: ({
       id,
       data,
@@ -78,62 +70,88 @@ export const useAdminUpdateArtist = () => {
       id: string;
       data: Partial<ArtistFormValues>;
     }) => artistApi.adminUpdate(id, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success("Cập nhật thông tin thành công");
-      queryClient.invalidateQueries({ queryKey: [artistKeys.all] });
-      queryClient.invalidateQueries({ queryKey: [artistKeys.detail] }); // Refresh trang detail nếu đang mở
+      queryClient.invalidateQueries({ queryKey: artistKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: artistKeys.detail(variables.id),
+      });
     },
-    onError: (err: any) =>
-      toast.error(err.response?.data?.message || "Lỗi cập nhật"),
+    onError: (err) => handleError(err, "Lỗi cập nhật"),
   });
-};
 
-export const useAdminToggleStatus = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: artistApi.adminToggleStatus,
+  // --- TOGGLE STATUS ---
+  const toggleStatusMutation = useMutation({
+    mutationFn: (id: string) => artistApi.adminToggleStatus(id),
     onSuccess: () => {
       toast.success("Đã thay đổi trạng thái");
-      queryClient.invalidateQueries({ queryKey: [artistKeys.all] });
+      queryClient.invalidateQueries({ queryKey: artistKeys.lists() });
     },
-    onError: () => toast.error("Có lỗi xảy ra"),
+    onError: (err) => handleError(err, "Lỗi thay đổi trạng thái"),
   });
-};
 
-export const useAdminDeleteArtist = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: artistApi.adminDelete,
+  // --- DELETE ---
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => artistApi.adminDelete(id),
     onSuccess: () => {
       toast.success("Đã xóa vĩnh viễn nghệ sĩ");
-      queryClient.invalidateQueries({ queryKey: [artistKeys.all] });
+      queryClient.invalidateQueries({ queryKey: artistKeys.lists() });
     },
-    onError: () => toast.error("Lỗi xóa nghệ sĩ"),
+    onError: (err) => handleError(err, "Lỗi xóa nghệ sĩ"),
   });
-};
 
-// ==========================================
-// 3. ARTIST HOOKS (Dùng cho trang Studio)
-// ==========================================
+  // ==========================================
+  // 4. HANDLERS
+  // ==========================================
+  const handlePageChange = (newPage: number) =>
+    setFilterParams((prev) => ({ ...prev, page: newPage }));
 
-export const useMyArtistProfile = () => {
-  return useQuery({
-    queryKey: ["my-artist-profile"],
-    queryFn: artistApi.getMyProfile,
-    retry: 1,
-  });
-};
+  const handleSearch = (keyword: string) =>
+    setFilterParams((prev) => ({ ...prev, keyword, page: 1 }));
 
-export const useUpdateMyArtistProfile = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: ArtistFormValues) => artistApi.updateMyProfile(data),
-    onSuccess: () => {
-      toast.success("Hồ sơ của bạn đã được cập nhật");
-      queryClient.invalidateQueries({ queryKey: ["my-artist-profile"] });
-      queryClient.invalidateQueries({ queryKey: [artistKeys.detail] }); // Update trang public
-    },
-    onError: (err: any) =>
-      toast.error(err.response?.data?.message || "Lỗi cập nhật"),
-  });
+  const handleFilterChange = (key: keyof ArtistFilterParams, value: any) =>
+    setFilterParams((prev) => ({ ...prev, [key]: value, page: 1 }));
+
+  return {
+    // Data
+    artists,
+    meta,
+    filterParams,
+
+    // Loading
+    isLoading: isLoading || isFetching,
+    isMutating:
+      createMutation.isPending ||
+      updateMutation.isPending ||
+      deleteMutation.isPending ||
+      toggleStatusMutation.isPending,
+    isError,
+
+    // Actions
+    setFilterParams,
+    handlePageChange,
+    handleSearch,
+    handleFilterChange,
+
+    // Wrappers
+    createArtist: (data: ArtistFormValues, options?: any) =>
+      createMutation.mutate(data, options),
+
+    updateArtist: (
+      id: string,
+      data: Partial<ArtistFormValues>,
+      options?: any,
+    ) => updateMutation.mutate({ id, data }, options),
+
+    toggleArtistStatus: (id: string, options?: any) =>
+      toggleStatusMutation.mutate(id, options),
+
+    deleteArtist: (id: string, options?: any) =>
+      deleteMutation.mutate(id, options),
+
+    // Async Variants
+    createArtistAsync: createMutation.mutateAsync,
+    updateArtistAsync: (id: string, data: Partial<ArtistFormValues>) =>
+      updateMutation.mutateAsync({ id, data }),
+  };
 };

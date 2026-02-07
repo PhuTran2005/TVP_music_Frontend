@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Menu,
@@ -9,15 +9,16 @@ import {
   Disc3,
   ListMusic,
   LogIn,
-  NotebookPen,
-  ChartColumn,
+  Sparkles,
+  Command,
+  LayoutDashboard,
+  KeyboardMusic,
+  ChartBar,
 } from "lucide-react";
-
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAppSelector } from "@/store/store";
 import { CLIENT_PATHS } from "@/config/paths";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,8 @@ import { ModeToggle } from "@/components/mode-toggle";
 import UserDropdown from "@/features/user/components/UserDropdown";
 import Avatar, { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import logo from "../../../../public/LOGO.png";
+import { useAppSelector } from "@/store/hooks";
+
 export function Header() {
   const { user } = useAppSelector((state) => state.auth);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -33,26 +36,29 @@ export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Đóng mobile menu khi chuyển route
+  // --- Logic Hooks ---
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Khóa scroll body khi mở mobile menu
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
     }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
   }, [isMobileMenuOpen]);
 
+  // --- Navigation Data ---
   const navItems = [
     { label: "Home", icon: Home, path: CLIENT_PATHS.HOME },
     {
-      label: "Browse",
-      icon: Music,
-      path: CLIENT_PATHS.CLIENT + CLIENT_PATHS.BROWSE,
+      label: "Charts",
+      icon: ChartBar,
+      path: CLIENT_PATHS.CLIENT + CLIENT_PATHS.CHART_TOP,
     },
     {
       label: "Artists",
@@ -69,6 +75,11 @@ export function Header() {
       icon: ListMusic,
       path: CLIENT_PATHS.CLIENT + CLIENT_PATHS.PLAYLISTS,
     },
+    {
+      label: "Genres",
+      icon: KeyboardMusic,
+      path: CLIENT_PATHS.CLIENT + CLIENT_PATHS.GENRES,
+    },
   ];
 
   const handleSearch = (e: React.FormEvent) => {
@@ -84,109 +95,97 @@ export function Header() {
       <motion.header
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        // Use semantic colors & borders
-        className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60"
+        transition={{ duration: 0.4, ease: [0.33, 1, 0.68, 1] }}
+        className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
       >
-        <div className="container mx-auto flex h-16 lg:h-[72px] items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* --- LEFT: LOGO & NAV --- */}
-          <div className="flex items-center gap-6 xl:gap-10">
-            {/* Logo */}
+        <div className="container mx-auto flex h-16 lg:h-18 items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* --- LEFT SECTION: LOGO & BRAND --- */}
+          <div className="flex items-center gap-8">
             <Link
               to="/"
-              className="flex items-center gap-2.5 group relative z-10 focus-visible:outline-none"
+              className="group flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
             >
-              <motion.div
-                className="size-10 rounded-xl flex items-center justify-center shadow-md shadow-primary/20 text-primary-foreground"
-                whileHover={{ scale: 1.05, rotate: 5 }}
-                transition={{ type: "spring", stiffness: 400, damping: 15 }}
-              >
-                <Avatar className="size-15 sm:size-10 border border-border/50 shadow-sm cursor-pointer">
+              <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-tr from-primary/20 to-primary/10 border border-primary/20 shadow-sm transition-transform duration-300 group-hover:scale-105 group-hover:shadow-primary/30">
+                <Avatar className="size-full rounded-xl">
                   <AvatarImage
                     src={logo}
-                    alt={user?.fullName || "User Avatar"}
-                    className="object-cover"
-                    referrerPolicy="no-referrer"
+                    alt="Logo"
+                    className="object-cover p-1" // Padding nhẹ để logo không bị sát viền
                   />
-                  <AvatarFallback className="bg-primary text-primary-foreground font-bold text-xs">
+                  <AvatarFallback className="bg-transparent font-bold text-primary">
                     TVP
                   </AvatarFallback>
                 </Avatar>
-              </motion.div>
+              </div>
             </Link>
 
-            {/* Desktop Nav */}
-            <nav className="hidden lg:flex items-center gap-1">
+            {/* --- DESKTOP NAVIGATION --- */}
+            <nav className="hidden lg:flex items-center gap-1 bg-muted/40 p-1 rounded-full border border-border/40">
               {navItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className="relative px-4 py-2 group focus-visible:outline-none"
+                    className={cn(
+                      "relative px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isActive
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                    )}
                   >
-                    <span
-                      className={cn(
-                        "text-sm font-medium transition-colors relative z-10",
-                        isActive
-                          ? "text-primary"
-                          : "text-muted-foreground group-hover:text-foreground" // Use foreground on hover
-                      )}
-                    >
-                      {item.label}
-                    </span>
                     {isActive && (
                       <motion.div
-                        layoutId="desktop-navbar-underline"
-                        className="absolute bottom-0 left-0 w-full h-[2px] bg-primary rounded-full"
+                        layoutId="desktop-nav-pill"
+                        className="absolute inset-0 bg-primary rounded-full shadow-md shadow-primary/20 z-0"
                         transition={{
                           type: "spring",
-                          stiffness: 500,
-                          damping: 30,
+                          bounce: 0.2,
+                          duration: 0.6,
                         }}
                       />
                     )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      {/* Icon chỉ hiện khi active để tạo điểm nhấn */}
+                      {isActive && <item.icon className="size-3.5" />}
+                      {item.label}
+                    </span>
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          {/* --- RIGHT: SEARCH, MODE & AUTH --- */}
-          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-            {/* Desktop Search */}
+          {/* --- RIGHT SECTION: SEARCH & ACTIONS --- */}
+          <div className="flex items-center gap-3">
+            {/* Desktop Search Bar */}
             <form
               onSubmit={handleSearch}
-              className="relative hidden sm:block group"
+              className="relative hidden md:block group w-full max-w-[280px]"
             >
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 group-focus-within:text-primary transition-colors" />
-              <Input
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                // Use --input, --background vars
-                className="w-[180px] lg:w-60 pl-9 h-10 bg-muted/50 border-transparent focus:bg-background focus:border-primary/30 focus:ring-2 focus:ring-primary/20 transition-all rounded-full"
-              />
+              <div className="relative flex items-center">
+                <Search className="absolute left-3 size-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input
+                  placeholder="Search music, artists..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-10 h-10 rounded-xl bg-secondary/50 border-transparent focus:bg-background focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all font-medium placeholder:text-muted-foreground/70"
+                />
+                {/* Visual Shortcut Hint */}
+                <div className="absolute right-3 hidden lg:flex items-center gap-0.5 text-[10px] font-bold text-muted-foreground/50 border border-border/50 px-1.5 py-0.5 rounded bg-background">
+                  <Command className="size-3" /> K
+                </div>
+              </div>
             </form>
 
-            {/* Mobile Search Icon */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="sm:hidden text-muted-foreground hover:text-foreground rounded-full hover:bg-muted"
-              onClick={() => navigate("/search")}
-            >
-              <Search className="size-5" />
-            </Button>
+            <div className="h-6 w-px bg-border/60 hidden sm:block mx-1" />
 
-            {/* Desktop Mode Toggle */}
-            <div className="hidden lg:flex">
+            {/* Theme Toggle */}
+            <div className="hidden sm:block">
               <ModeToggle />
             </div>
 
-            {/* Divider (Desktop only) */}
-            <div className="hidden lg:block h-6 w-px bg-border mx-1"></div>
-
-            {/* Auth Buttons */}
+            {/* Auth Actions */}
             {user ? (
               <UserDropdown user={user} navigate={navigate} />
             ) : (
@@ -194,46 +193,45 @@ export function Header() {
                 <Button
                   variant="ghost"
                   onClick={() => navigate("/login")}
-                  className="font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  className="font-semibold text-muted-foreground hover:text-foreground whitespace-nowrap"
                 >
                   Log in
                 </Button>
                 <Button
                   onClick={() => navigate("/register")}
-                  className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-6 shadow-md shadow-primary/20 h-10 border-none"
+                  className="rounded-full px-6 font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform whitespace-nowrap"
                 >
+                  <Sparkles className="size-4 mr-2 fill-current" />
                   Sign up
                 </Button>
               </div>
             )}
 
-            {/* Mobile Menu Toggle */}
+            {/* Mobile Menu Trigger */}
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden text-muted-foreground hover:text-foreground hover:bg-muted -mr-2"
+              className="lg:hidden text-foreground -mr-2 hover:bg-transparent active:scale-95"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               <AnimatePresence mode="wait">
                 {isMobileMenuOpen ? (
                   <motion.div
                     key="close"
-                    initial={{ rotate: -90, opacity: 0 }}
+                    initial={{ rotate: -45, opacity: 0 }}
                     animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ rotate: 45, opacity: 0 }}
                   >
-                    <X className="size-6" />
+                    <X className="size-7" />
                   </motion.div>
                 ) : (
                   <motion.div
                     key="menu"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
                   >
-                    <Menu className="size-6" />
+                    <Menu className="size-7" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -242,34 +240,36 @@ export function Header() {
         </div>
       </motion.header>
 
-      {/* --- MOBILE MENU --- */}
+      {/* --- MOBILE NAVIGATION DRAWER --- */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "calc(100vh - 4rem)" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-            className="fixed top-16 lg:top-[72px] left-0 z-40 w-full bg-background/95 backdrop-blur-2xl border-t border-border overflow-hidden lg:hidden flex flex-col"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="fixed inset-0 top-[64px] z-40 bg-background/95 backdrop-blur-3xl lg:hidden flex flex-col"
           >
-            {/* Scrollable Content */}
-            <div className="overflow-y-auto p-4 sm:p-6 flex flex-col gap-6 flex-1">
-              {/* Mobile Search Input */}
-              <form onSubmit={handleSearch} className="relative sm:hidden">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
+            <div className="flex flex-col h-full p-6 gap-6 overflow-y-auto">
+              {/* Mobile Search */}
+              <form onSubmit={handleSearch} className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground size-5" />
                 <Input
-                  placeholder="Search music..."
+                  placeholder="What do you want to listen to?"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 h-11 bg-muted/50 border-transparent rounded-xl focus:bg-background focus:border-primary/30"
+                  className="w-full pl-11 h-12 rounded-2xl bg-muted/50 border-transparent text-lg focus:border-primary focus:bg-background"
+                  autoFocus
                 />
               </form>
 
-              {/* Nav Items */}
-              <nav className="flex flex-col gap-1">
+              {/* Mobile Links Grid */}
+              <div className="grid gap-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 px-2">
+                  Menu
+                </p>
                 {navItems.map((item, index) => {
                   const isActive = location.pathname === item.path;
-                  const Icon = item.icon;
                   return (
                     <motion.div
                       key={item.path}
@@ -281,16 +281,16 @@ export function Header() {
                         to={item.path}
                         onClick={() => setIsMobileMenuOpen(false)}
                         className={cn(
-                          "flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-medium text-base",
+                          "flex items-center gap-4 px-4 py-4 rounded-xl transition-all text-lg font-medium",
                           isActive
-                            ? "bg-primary/10 text-primary font-bold shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            ? "bg-primary/10 text-primary font-bold shadow-sm border border-primary/20"
+                            : "text-foreground/80 hover:bg-muted hover:text-foreground"
                         )}
                       >
-                        <Icon
+                        <item.icon
                           className={cn(
-                            "size-5",
-                            isActive ? "text-primary" : "text-muted-foreground"
+                            "size-6",
+                            isActive ? "fill-primary/20" : ""
                           )}
                         />
                         {item.label}
@@ -298,65 +298,50 @@ export function Header() {
                     </motion.div>
                   );
                 })}
+
                 {user?.role === "admin" && (
                   <motion.div
-                    key={"admin"}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 + navItems.length * 0.05 }}
+                    transition={{ delay: 0.4 }}
                   >
                     <Link
                       to="/admin"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-medium text-base",
-                        "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      )}
+                      className="flex items-center gap-4 px-4 py-4 rounded-xl text-lg font-medium text-foreground/80 hover:bg-muted hover:text-foreground mt-2 border-t border-border/50"
                     >
-                      <ChartColumn
-                        className={cn("size-5", "text-muted-foreground")}
-                      />
+                      <LayoutDashboard className="size-6" />
                       Admin Dashboard
                     </Link>
                   </motion.div>
                 )}
-              </nav>
-            </div>
+              </div>
 
-            {/* --- MOBILE FOOTER --- */}
-            {!user && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                // Use border-t border-border
-                className="p-4 sm:p-6 border-t border-border bg-muted/30 sm:pb-8 shrink-0"
-              >
-                <div className="grid grid-cols-2 gap-3">
+              {/* Mobile Auth & Footer */}
+              {!user && (
+                <div className="mt-auto pt-6 border-t border-border/50 space-y-4">
                   <Button
-                    variant="outline"
-                    className="w-full h-11 rounded-xl text-base border-border bg-background hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      navigate("/login");
-                    }}
-                  >
-                    <LogIn className="mr-2 size-4" />
-                    Log in
-                  </Button>
-                  <Button
-                    className="w-full h-11 rounded-xl text-base bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 border-none"
+                    className="w-full h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/25"
                     onClick={() => {
                       setIsMobileMenuOpen(false);
                       navigate("/register");
                     }}
                   >
-                    <NotebookPen className="mr-2 size-4" />
-                    Sign up
+                    Sign up free
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 rounded-xl text-lg font-semibold bg-transparent border-2 hover:bg-accent"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      navigate("/login");
+                    }}
+                  >
+                    <LogIn className="mr-2 size-5" /> Log in
                   </Button>
                 </div>
-              </motion.div>
-            )}
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

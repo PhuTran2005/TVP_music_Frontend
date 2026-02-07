@@ -1,9 +1,9 @@
 // src/layouts/RootLayout.tsx
 import { Outlet } from "react-router-dom";
-import { useAppSelector } from "@/store/store";
 import { useInitAuth } from "@/features/auth";
 import { PulseLoader } from "@/components/ui/MusicLoadingEffects";
-import { MusicPlayer } from "@/components/MusicPlayer";
+import { MusicPlayer } from "@/features/player/components/MusicPlayer";
+import { useAppSelector } from "@/store/hooks";
 
 const RootLayout = () => {
   const { isAuthChecking } = useAppSelector((state) => state.auth);

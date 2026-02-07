@@ -7,34 +7,45 @@ import {
 import { toast } from "sonner";
 import playlistApi from "../api/playlistApi";
 import type { PlaylistFilterParams } from "@/features/playlist/types";
-
-// Key Constants
-const KEYS = {
-  LIST: "playlists",
-  MY_LIST: "my-playlists",
-  DETAIL: "playlist-detail",
-};
+import { playlistKeys } from "@/features/playlist/utils/playlistKeys";
+import { pl } from "date-fns/locale";
 
 // --- QUERIES (Giữ nguyên) ---
 export const usePlaylists = (params: PlaylistFilterParams) => {
   return useQuery({
-    queryKey: [KEYS.LIST, params],
+    queryKey: playlistKeys.list(params),
     queryFn: () => playlistApi.getAll(params),
     placeholderData: keepPreviousData,
   });
 };
-
+export const useFeaturePlaylist = (limit = 10) => {
+  return useQuery({
+    queryKey: playlistKeys.list({ sort: "popular" }),
+    queryFn: async () => {
+      const res = await playlistApi.getAll({
+        page: 1,
+        limit,
+        sort: "popular",
+        isSystem: true,
+        visibility: "public",
+      });
+      console.log("useFeaturePlaylist res:", res);
+      return res.data.data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+};
 export const useMyPlaylists = () => {
   return useQuery({
-    queryKey: [KEYS.MY_LIST],
+    queryKey: playlistKeys.list({}),
     queryFn: playlistApi.getMyPlaylists,
   });
 };
 
 export const usePlaylistDetail = (id: string) => {
   return useQuery({
-    queryKey: [KEYS.DETAIL, id],
-    queryFn: () => playlistApi.getDetail(id),
+    queryKey: playlistKeys.detail(id),
+    queryFn: () => playlistApi.getOne(id),
     enabled: !!id,
   });
 };
@@ -46,8 +57,8 @@ export const useCreatePlaylist = () => {
     mutationFn: playlistApi.create,
     onSuccess: () => {
       toast.success("Tạo playlist thành công!");
-      queryClient.invalidateQueries({ queryKey: [KEYS.MY_LIST] });
-      queryClient.invalidateQueries({ queryKey: [KEYS.LIST] });
+      queryClient.invalidateQueries({ queryKey: playlistKeys.list({}) });
+      queryClient.invalidateQueries({ queryKey: playlistKeys.list({}) });
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.message || "Lỗi tạo playlist"),
@@ -61,9 +72,9 @@ export const useUpdatePlaylist = () => {
       playlistApi.update(id, data),
     onSuccess: (_, { id }) => {
       toast.success("Cập nhật thành công!");
-      queryClient.invalidateQueries({ queryKey: [KEYS.DETAIL, id] });
-      queryClient.invalidateQueries({ queryKey: [KEYS.MY_LIST] });
-      queryClient.invalidateQueries({ queryKey: [KEYS.LIST] }); // Refresh cả list public nếu cần
+      queryClient.invalidateQueries({ queryKey: playlistKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: playlistKeys.list({}) });
+      queryClient.invalidateQueries({ queryKey: playlistKeys.list({}) }); // Refresh cả list public nếu cần
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.message || "Lỗi cập nhật"),
@@ -76,8 +87,8 @@ export const useDeletePlaylist = () => {
     mutationFn: playlistApi.delete,
     onSuccess: () => {
       toast.success("Đã xóa playlist");
-      queryClient.invalidateQueries({ queryKey: [KEYS.MY_LIST] });
-      queryClient.invalidateQueries({ queryKey: [KEYS.LIST] });
+      queryClient.invalidateQueries({ queryKey: playlistKeys.list({}) });
+      queryClient.invalidateQueries({ queryKey: playlistKeys.list({}) });
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.message || "Lỗi xóa playlist"),
@@ -103,7 +114,9 @@ export const useAddTracksToPlaylist = () => {
           ? `Đã thêm ${trackIds.length} bài hát`
           : "Đã thêm vào playlist";
       toast.success(msg);
-      queryClient.invalidateQueries({ queryKey: [KEYS.DETAIL, playlistId] });
+      queryClient.invalidateQueries({
+        queryKey: playlistKeys.detail(playlistId),
+      });
     },
     onError: (err: any) =>
       // toast.error(err.response?.data?.message || "Không thể thêm bài hát")
@@ -158,10 +171,11 @@ export const useReorderPlaylistTracks = () => {
 
     // Optimistic Update (Nâng cao): Cập nhật UI ngay lập tức trước khi API trả về
     onMutate: async ({ playlistId, rangeStart, insertBefore }) => {
-      await queryClient.cancelQueries({ queryKey: [KEYS.DETAIL, playlistId] });
+      await queryClient.cancelQueries({
+        queryKey: playlistKeys.detail(playlistId),
+      });
       const previousPlaylist = queryClient.getQueryData([
-        KEYS.DETAIL,
-        playlistId,
+        playlistKeys.detail(playlistId),
       ]);
 
       // Logic update cache thủ công ở đây nếu muốn UI mượt (hoặc bỏ qua chờ onSuccess)
@@ -170,13 +184,15 @@ export const useReorderPlaylistTracks = () => {
 
     onSuccess: (_, { playlistId }) => {
       // Không cần toast success cho thao tác kéo thả vì nó xảy ra liên tục
-      queryClient.invalidateQueries({ queryKey: [KEYS.DETAIL, playlistId] });
+      queryClient.invalidateQueries({
+        queryKey: playlistKeys.detail(playlistId),
+      });
     },
     onError: (err: any, { playlistId }, context) => {
       // Nếu lỗi thì rollback lại thứ tự cũ
       if (context?.previousPlaylist) {
         queryClient.setQueryData(
-          [KEYS.DETAIL, playlistId],
+          playlistKeys.detail(playlistId),
           context.previousPlaylist
         );
       }

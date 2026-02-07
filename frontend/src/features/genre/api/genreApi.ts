@@ -5,6 +5,7 @@ import type {
   UpdateGenreInput,
   Genre,
   GenreFilterParams,
+  GenreDetail,
 } from "../types";
 import { buildFormData } from "@/utils/form-data";
 
@@ -15,7 +16,10 @@ const genreApi = {
     });
     return res.data;
   },
-
+  getBySlug: async (slug: string) => {
+    const res = await api.get<ApiResponse<GenreDetail>>("/genres/" + slug);
+    return res.data;
+  },
   create: async (data: CreateGenreInput) => {
     const formData = buildFormData(data);
     console.log(data, ...formData);

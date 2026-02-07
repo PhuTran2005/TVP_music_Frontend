@@ -9,81 +9,76 @@ import { type ApiResponse, type PagedResponse } from "@/types";
 import { buildFormData } from "@/utils/form-data";
 
 const playlistApi = {
-  // 1. Lấy danh sách (SỬA LẠI: Thêm async/await và return .data)
+  // 1. GET LIST
   getAll: async (params: PlaylistFilterParams) => {
     const response = await api.get<ApiResponse<PagedResponse<Playlist>>>(
       "/playlists",
-      {
-        params,
-      }
+      { params }
     );
     return response.data;
   },
 
-  // 2. Lấy Playlist của tôi
-  getMyPlaylists: async () => {
-    const response = await api.get<{ data: Playlist[] }>("/playlists/me/all");
+  // 2. GET ONE (Detail)
+  getOne: async (id: string) => {
+    const response = await api.get<ApiResponse<Playlist>>(`/playlists/${id}`);
     return response.data;
   },
 
-  // 3. Lấy chi tiết
-  getDetail: async (id: string) => {
-    const response = await api.get<{ data: Playlist }>(`/playlists/${id}`);
-    return response.data;
-  },
-
-  // 4. Tạo Playlist
+  // 3. CREATE (FormData for Image)
   create: async (data: CreatePlaylistInput) => {
     const formData = buildFormData(data);
-    console.log("Form Data:", data, ...formData);
-    // SỬA: return response.data
     const response = await api.post("/playlists", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
 
-  // 5. Cập nhật
+  // 4. UPDATE METADATA (PATCH)
   update: async (id: string, data: UpdatePlaylistInput) => {
-    // SỬA: return response.data
     const formData = buildFormData(data);
-    console.log("Form Data:", data, ...formData);
+    console.log(formData);
     const response = await api.patch(`/playlists/${id}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
 
-  // 6. Xóa Playlist
+  // 5. DELETE
   delete: async (id: string) => {
     const response = await api.delete(`/playlists/${id}`);
     return response.data;
   },
 
-  // 7. Thêm bài hát
-  // Sửa addTrack cũ thành addTracks nhận mảng
-  addTracks: (playlistId: string, trackIds: string[]) => {
-    const res = api.post(`/playlists/${playlistId}/tracks`, { trackIds });
-    console.log("Add Tracks Response:", res);
-    return res;
+  // --- TRACK MANAGEMENT ---
+
+  // 6. ADD TRACKS (POST)
+  addTracks: async (playlistId: string, trackIds: string[]) => {
+    // API backend: POST /api/playlists/:id/tracks
+    // Body: { trackIds: [...] }
+    const response = await api.post(`/playlists/${playlistId}/tracks`, {
+      trackIds,
+    });
+    return response.data;
   },
 
-  removeTracks: (playlistId: string, trackIds: string[]) => {
-    return api.delete(`/playlists/${playlistId}/tracks`, {
-      data: { trackIds }, // Axios yêu cầu body của DELETE phải nằm trong key 'data'
+  // 7. REMOVE TRACKS (Single - DELETE)
+  removeTracks: async (playlistId: string, trackIds: string[]) => {
+    // API backend: DELETE /api/playlists/:id/tracks/:trackId
+    const response = await api.delete(`/playlists/${playlistId}/tracks`, {
+      data: { trackIds },
     });
+
+    return response.data;
   },
 
-  // API reorder (nếu backend hỗ trợ)
-  reorderTracks: (
-    playlistId: string,
-    rangeStart: number,
-    insertBefore: number
-  ) => {
-    return api.put(`/playlists/${playlistId}/tracks/reorder`, {
-      rangeStart,
-      insertBefore,
+  // 8. 🔥 REORDER TRACKS (PUT)
+  // Payload: Danh sách trackIds mới đã được sắp xếp
+  reorderTracks: async (playlistId: string, trackIds: string[]) => {
+    // API backend: PUT /api/playlists/:id/tracks
+    const response = await api.put(`/playlists/${playlistId}/tracks`, {
+      trackIds,
     });
+    return response.data;
   },
 };
 

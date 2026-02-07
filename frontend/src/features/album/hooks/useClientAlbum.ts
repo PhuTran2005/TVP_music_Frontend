@@ -1,59 +1,77 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import albumApi from "../api/albumApi"; // Đảm bảo import đúng
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import albumApi from "../api/albumApi";
 import { albumKeys } from "@/features/album/utils/albumKeys";
-import { AlbumFilterParams } from "@/features/album/types";
+import type { AlbumFilterParams } from "@/features/album/types";
 
 // ==========================================
-// 1. Hook: Danh sách Album Public (Dùng cho trang AlbumPage)
+// 1. PUBLIC LISTS (Trang Album, Search)
 // ==========================================
+
+/**
+ * Hook lấy danh sách Album Public (có phân trang, filter)
+ * Dùng cho trang: /albums, /search
+ */
 export const usePublicAlbums = (params: AlbumFilterParams) => {
   return useQuery({
-    // Key phụ thuộc vào params để tự động refetch khi user đổi trang/filter
+    // Key: ['albums', 'list', { filter: ... }]
+    queryKey: albumKeys.list(params),
+
+    queryFn: async () => {
+      const res = await albumApi.getPublicAlbums(params);
+      return res.data; // Trả về cấu trúc { data: [], meta: {} }
+    },
+
+    // Giữ UI cũ khi đang tải trang mới (UX mượt mà)
+    placeholderData: keepPreviousData,
+
+    // Cache 2 phút (List có thể thay đổi thứ tự/số lượng)
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+// ==========================================
+// 2. SPOTLIGHTS (Trang Home)
+// ==========================================
+
+/**
+ * Hook lấy Album mới phát hành
+ */
+export const useNewReleases = (limit = 10) => {
+  const params = { page: 1, limit, sort: "newest" } as const;
+
+  return useQuery({
     queryKey: albumKeys.list(params),
     queryFn: async () => {
       const res = await albumApi.getPublicAlbums(params);
-      return res.data; // Trả về { data: [], meta: {} }
+      return res.data.data; // Chỉ lấy mảng data
     },
-    placeholderData: keepPreviousData, // Giữ UI cũ khi đang tải trang mới -> UX mượt
-    staleTime: 2 * 60 * 1000, // Cache 2 phút
+    staleTime: 5 * 60 * 1000, // 5 phút
   });
 };
 
-// ==========================================
-// 2. Hook: Mới phát hành (Home Page - Simplified)
-// ==========================================
-export const useNewReleases = (limit = 10) => {
-  return useQuery({
-    queryKey: albumKeys.list({ sort: "newest" }),
-    queryFn: async () => {
-      const res = await albumApi.getPublicAlbums({
-        page: 1,
-        limit,
-        sort: "newest",
-      });
-      return res.data.data;
-    },
-    staleTime: 10 * 60 * 1000,
-  });
-};
+/**
+ * Hook lấy Album nổi bật/phổ biến
+ */
 export const useFeatureAlbum = (limit = 10) => {
+  const params = { page: 1, limit, sort: "popular" } as const;
+
   return useQuery({
-    queryKey: albumKeys.list({ sort: "popular" }),
+    queryKey: albumKeys.list(params),
     queryFn: async () => {
-      const res = await albumApi.getPublicAlbums({
-        page: 1,
-        limit,
-        sort: "popular",
-      });
+      const res = await albumApi.getPublicAlbums(params);
       return res.data.data;
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 phút (Popular ít biến động hơn Newest)
   });
 };
 
 // ==========================================
-// 2. Hook: Chi tiết Album (Detail)
+// 3. DETAIL & RELATED
 // ==========================================
+
+/**
+ * Hook lấy chi tiết Album
+ */
 export const useAlbumDetail = (slug: string) => {
   return useQuery({
     queryKey: albumKeys.detail(slug),
@@ -61,29 +79,43 @@ export const useAlbumDetail = (slug: string) => {
       const res = await albumApi.getAlbumDetail(slug);
       return res.data;
     },
-    enabled: !!slug, // Chỉ chạy khi có slug
-    staleTime: 30 * 60 * 1000, // ✅ Cache 30 phút. Detail album hiếm khi đổi.
-    retry: 1, // Nếu lỗi, thử lại 1 lần thôi rồi báo lỗi (tránh spam server nếu 404)
+    enabled: !!slug,
+    staleTime: 30 * 60 * 1000, // 30 phút (Detail album hiếm khi đổi)
+    retry: 1, // Hạn chế retry nếu 404
   });
 };
 
-// ==========================================
-// 4. Hook: Album liên quan (Bonus Logic)
-// ==========================================
-// Thường trang detail cần hiện thêm "Có thể bạn thích"
+/**
+ * Hook lấy Album liên quan (Cùng Genre)
+ * Thường dùng ở cuối trang Detail
+ */
 export const useRelatedAlbums = (currentAlbumId: string, genreId?: string) => {
+  // Tạo params ảo để làm unique key cho React Query
+  // Note: Cần ép kiểu hoặc đảm bảo AlbumFilterParams cho phép các field mở rộng nếu cần
+  const filterParams: any = {
+    limit: 5,
+    genreId,
+    exclude: currentAlbumId, // field này giúp key unique theo bài hiện tại
+  };
+
   return useQuery({
-    queryKey: albumKeys.list(`related-${currentAlbumId}`),
+    // 🔥 FIX: Truyền object vào list() thay vì string
+    queryKey: albumKeys.list(filterParams),
+
     queryFn: async () => {
       if (!genreId) return [];
-      // Giả sử API hỗ trợ filter theo genre
       const res = await albumApi.getPublicAlbums({
         limit: 5,
-        genreId: genreId,
-        exclude: currentAlbumId, // Loại trừ album đang xem
+        genreId,
+        // Lưu ý: API cần hỗ trợ param 'exclude' hoặc xử lý lọc ở FE
+        // Nếu API chưa hỗ trợ 'exclude', bạn có thể filter thủ công ở đây:
+        // return res.data.data.filter(a => a._id !== currentAlbumId);
       });
-      return res.data.data;
+
+      // Giả sử API trả về list, ta lọc client-side để chắc chắn không trùng bài đang xem
+      return res.data.data.filter((a: any) => a._id !== currentAlbumId);
     },
+
     enabled: !!currentAlbumId && !!genreId,
     staleTime: 15 * 60 * 1000,
   });

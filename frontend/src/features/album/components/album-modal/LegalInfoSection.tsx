@@ -1,10 +1,10 @@
 import React from "react";
 import { Controller, type UseFormReturn } from "react-hook-form";
 import { Copyright, Barcode, Building2, Tag } from "lucide-react";
-import { type AlbumFormValues } from "@/features/album/schemas/album.schema";
-import { TagInput } from "@/components/ui/tag-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TagInput } from "@/components/ui/tag-input"; // Giả định component nhập tag
+import type { AlbumFormValues } from "@/features/album/schemas/album.schema";
 
 interface LegalInfoSectionProps {
   form: UseFormReturn<AlbumFormValues>;
@@ -21,7 +21,7 @@ const LegalInfoSection: React.FC<LegalInfoSectionProps> = ({ form }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-muted-foreground">
+          <Label className="text-[10px] uppercase text-muted-foreground">
             Record Label
           </Label>
           <div className="relative">
@@ -35,7 +35,7 @@ const LegalInfoSection: React.FC<LegalInfoSectionProps> = ({ form }) => {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-muted-foreground">
+          <Label className="text-[10px] uppercase text-muted-foreground">
             UPC / EAN
           </Label>
           <div className="relative">
@@ -50,7 +50,7 @@ const LegalInfoSection: React.FC<LegalInfoSectionProps> = ({ form }) => {
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs uppercase text-muted-foreground">
+        <Label className="text-[10px] uppercase text-muted-foreground">
           Copyright Notice
         </Label>
         <Input
@@ -60,7 +60,7 @@ const LegalInfoSection: React.FC<LegalInfoSectionProps> = ({ form }) => {
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs uppercase text-muted-foreground flex items-center gap-1.5">
+        <Label className="text-[10px] uppercase text-muted-foreground flex items-center gap-1.5">
           Tags <Tag className="size-3" />
         </Label>
         <Controller

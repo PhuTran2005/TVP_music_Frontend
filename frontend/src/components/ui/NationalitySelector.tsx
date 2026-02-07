@@ -43,7 +43,7 @@ export const NationalitySelector: React.FC<NationalitySelectorProps> = ({
   value,
   onChange,
   autoDetect = false,
-  placeholder = "Quốc tịch...",
+  placeholder = "Chọn quốc tịch...",
   className,
   disabled = false,
 }) => {
@@ -87,66 +87,72 @@ export const NationalitySelector: React.FC<NationalitySelectorProps> = ({
           variant="outline"
           role="combobox"
           className={cn(
-            "w-full justify-between h-10 bg-background border-border/50 rounded-xl px-3 transition-all hover:border-primary/30 hover:bg-accent/30",
-            open && "ring-2 ring-primary/10 border-primary/30",
+            // Base styles: Viền rõ, nền sạch, shadow nhẹ
+            "w-full justify-between h-10 bg-background border-input px-3 shadow-sm transition-all",
+            "hover:bg-accent hover:text-accent-foreground hover:border-primary/50",
+            // Focus/Open state
+            open && "ring-2 ring-primary/20 border-primary",
             className
           )}
           disabled={isDetecting || disabled}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             {isDetecting ? (
-              <Loader2 className="size-3.5 animate-spin text-primary" />
+              <Loader2 className="size-4 animate-spin text-primary" />
             ) : selectedCountry ? (
-              <span className="text-base leading-none shrink-0">
+              <span className="text-lg leading-none shrink-0 border border-border/50 rounded-sm overflow-hidden shadow-sm">
                 {selectedCountry.flag}
               </span>
             ) : (
-              <Globe className="size-4 text-muted-foreground/40 shrink-0" />
+              <Globe className="size-4 text-muted-foreground shrink-0" />
             )}
 
             <span
               className={cn(
-                "truncate text-sm font-medium",
-                !selectedCountry && "text-muted-foreground font-normal"
+                "truncate text-sm",
+                // Logic màu chữ: Selected -> Foreground (đậm), Placeholder -> Muted
+                selectedCountry
+                  ? "font-semibold text-foreground"
+                  : "font-medium text-muted-foreground"
               )}
             >
               {isDetecting
-                ? "Đang xác định..."
+                ? "Đang xác định vị trí..."
                 : selectedCountry?.label || placeholder}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          <div className="flex items-center gap-1 shrink-0 ml-2">
             {autoDetect && selectedCountry && !isDetecting && (
-              <Sparkles className="size-3 text-primary/60 animate-pulse" />
+              <Sparkles className="size-3 text-amber-500 fill-amber-500/20 animate-pulse" />
             )}
-            <ChevronsUpDown className="size-3.5 opacity-30" />
+            <ChevronsUpDown className="size-4 text-muted-foreground/50" />
           </div>
         </Button>
       </PopoverTrigger>
 
       <PopoverContent
-        className="w-[280px] p-0 rounded-2xl shadow-2xl border-border/40 overflow-hidden"
+        className="w-[280px] p-0 rounded-xl shadow-xl border-border ring-1 ring-black/5 overflow-hidden"
         align="start"
-        sideOffset={6}
+        sideOffset={8}
       >
-        <Command className="rounded-none">
-          <div className="flex items-center border-b border-border/40 px-3 bg-muted/20">
-            <Search className="size-3.5 shrink-0 opacity-40" />
+        <Command className="bg-popover">
+          <div className="flex items-center border-b border-border px-3 bg-muted/30">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
             <CommandInput
-              placeholder="Tìm quốc gia..."
-              className="h-10 border-none focus:ring-0 text-sm"
+              placeholder="Tìm kiếm quốc gia..."
+              className="h-10 border-none focus:ring-0 text-sm bg-transparent"
             />
           </div>
 
           <CommandList className="max-h-[300px] custom-scrollbar p-1">
-            <CommandEmpty className="py-8 text-center text-xs text-muted-foreground">
-              Không tìm thấy kết quả.
+            <CommandEmpty className="py-6 text-center text-xs font-medium text-muted-foreground">
+              Không tìm thấy kết quả phù hợp.
             </CommandEmpty>
 
             <CommandGroup
               heading={
-                <span className="px-2 text-[10px] font-bold uppercase tracking-tighter text-primary/60">
+                <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-primary">
                   Phổ biến
                 </span>
               }
@@ -161,12 +167,12 @@ export const NationalitySelector: React.FC<NationalitySelectorProps> = ({
               ))}
             </CommandGroup>
 
-            <CommandSeparator className="my-1 opacity-50" />
+            <CommandSeparator className="my-1 bg-border/60" />
 
             <CommandGroup
               heading={
-                <span className="px-2 text-[10px] font-bold uppercase tracking-tighter text-muted-foreground/50">
-                  Tất cả
+                <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Tất cả quốc gia
                 </span>
               }
             >
@@ -186,7 +192,7 @@ export const NationalitySelector: React.FC<NationalitySelectorProps> = ({
   );
 };
 
-// --- SUB-COMPONENT TỐI GIẢN ---
+// --- SUB-COMPONENT ---
 const CountryItem = React.memo(
   ({
     country,
@@ -201,21 +207,34 @@ const CountryItem = React.memo(
       value={`${country.label} ${country.value}`}
       onSelect={() => onSelect(country.value)}
       className={cn(
-        "flex items-center justify-between py-2 px-2.5 cursor-pointer rounded-lg transition-all duration-150",
-        "aria-selected:bg-primary/5 aria-selected:text-primary",
-        isSelected && "bg-primary/10 text-primary"
+        "flex items-center justify-between py-2 px-3 rounded-lg cursor-pointer transition-colors mb-0.5",
+        // Hover state rõ ràng
+        "aria-selected:bg-accent aria-selected:text-accent-foreground",
+        // Active state đậm đà
+        isSelected && "bg-primary/15 text-primary aria-selected:bg-primary/20"
       )}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <span className="text-lg leading-none shrink-0">{country.flag}</span>
-        <span className="text-sm font-medium truncate">{country.label}</span>
-        <span className="text-[10px] font-mono opacity-30 uppercase tracking-tighter shrink-0">
-          {country.value}
+        <span className="text-lg leading-none shrink-0 shadow-sm rounded-sm overflow-hidden">
+          {country.flag}
+        </span>
+        <span
+          className={cn(
+            "text-sm truncate",
+            isSelected ? "font-bold" : "font-medium"
+          )}
+        >
+          {country.label}
         </span>
       </div>
 
       {isSelected && (
-        <Check className="size-3.5 stroke-[3] text-primary animate-in zoom-in duration-300" />
+        <Check className="size-4 stroke-[3] text-primary shrink-0 animate-in zoom-in duration-200" />
+      )}
+      {!isSelected && (
+        <span className="text-[10px] font-mono text-muted-foreground/50 uppercase">
+          {country.value}
+        </span>
       )}
     </CommandItem>
   )

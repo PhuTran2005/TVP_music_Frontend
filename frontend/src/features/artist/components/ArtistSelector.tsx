@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from "react";
-import { Search, Check, X } from "lucide-react";
+import { Search, Check, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Artist } from "@/features/artist/types";
-import { useAdminArtists } from "@/features/artist/hooks";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitialsTextAvartar } from "@/utils/genTextAvartar";
 import { Label } from "@/components/ui/label";
+import { useArtistAdmin } from "@/features/artist/hooks";
 
 interface ArtistSelectorProps {
   label?: string;
@@ -30,18 +30,15 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
   className,
 }) => {
   const [filter, setFilter] = useState("");
-  const { data: artistRes, isLoading } = useAdminArtists({
-    page: 1,
-    limit: 50,
-  });
+  const { artists: artistRes, isLoading } = useArtistAdmin(50);
 
-  const artists = useMemo(() => artistRes?.data?.data || [], [artistRes]);
+  const artists = useMemo(() => artistRes || [], [artistRes]);
 
   const filteredArtists = useMemo(() => {
     let result = artists;
     if (filter) {
       result = result.filter((a: Artist) =>
-        a.name.toLowerCase().includes(filter.toLowerCase())
+        a.name.toLowerCase().includes(filter.toLowerCase()),
       );
     }
     return result;
@@ -62,23 +59,25 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
   };
 
   return (
-    <div className={cn("space-y-2.5 w-full", className)}>
+    <div className={cn("space-y-3 w-full", className)}>
       {/* --- LABEL --- */}
       {label && (
-        <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-[0.15em] flex items-center gap-1.5 ml-0.5">
+        <Label className="text-xs font-bold uppercase text-foreground/80 tracking-wider flex items-center gap-1.5 ml-0.5">
           {label}{" "}
-          {required && <span className="text-destructive font-black">*</span>}
+          {required && <span className="text-destructive text-sm">*</span>}
         </Label>
       )}
 
       {/* --- SEARCH --- */}
       <div className="relative group">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground transition-colors group-focus-within:text-primary" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
         <Input
           placeholder="Tìm nghệ sĩ..."
+          // Thay đổi: Nền đặc và viền rõ ràng (border-input)
           className={cn(
-            "pl-9 h-10 text-sm bg-muted/20 border-none rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40",
-            error && "ring-1 ring-destructive/50"
+            "pl-9 pr-8 h-10 text-sm bg-background border-input shadow-sm rounded-lg focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
+            error &&
+              "border-destructive focus-visible:ring-destructive/20 bg-destructive/5",
           )}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -87,7 +86,7 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
           <button
             type="button"
             onClick={() => setFilter("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
           >
             <X className="size-3.5" />
           </button>
@@ -95,18 +94,15 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
       </div>
 
       {/* --- LIST --- */}
-      <div className="max-h-48 overflow-y-auto custom-scrollbar pr-1 border border-border/50 rounded-xl bg-muted/5">
+      {/* Thay đổi: Khung viền đậm hơn, background sạch */}
+      <div className="max-h-52 overflow-y-auto custom-scrollbar pr-1 border border-border shadow-sm rounded-xl bg-background overflow-hidden">
         {isLoading ? (
-          <div className="space-y-3 p-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-3 animate-pulse">
-                <div className="size-8 rounded-full bg-muted" />
-                <div className="h-3 w-24 bg-muted rounded" />
-              </div>
-            ))}
+          <div className="flex justify-center items-center py-8 text-xs text-muted-foreground gap-2">
+            <Loader2 className="size-4 animate-spin text-primary" /> Đang tải
+            danh sách...
           </div>
         ) : filteredArtists.length > 0 ? (
-          <div className="p-1 space-y-0.5">
+          <div className="p-1.5 space-y-1">
             {filteredArtists.map((artist: Artist) => {
               const isSelected =
                 Array.isArray(value) && value.includes(artist._id);
@@ -117,47 +113,73 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
                   key={artist._id}
                   onClick={() => !isDisabled && toggleArtist(artist._id)}
                   className={cn(
-                    "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all border border-transparent",
-                    isSelected
-                      ? "bg-primary/10 text-primary border-primary/20"
-                      : "hover:bg-muted/50",
-                    isDisabled &&
-                      "opacity-40 cursor-not-allowed grayscale pointer-events-none"
+                    "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all border",
+                    isDisabled
+                      ? "opacity-50 cursor-not-allowed bg-muted/30 border-transparent grayscale"
+                      : isSelected
+                        ? // Thay đổi: Trạng thái chọn rõ ràng hơn (nền primary nhạt + viền)
+                          "bg-primary/10 border-primary/20 shadow-sm"
+                        : "bg-transparent border-transparent hover:bg-secondary hover:text-secondary-foreground",
                   )}
                 >
-                  <Avatar className="size-7 border border-background shadow-sm">
-                    <AvatarImage src={artist.avatar} alt={artist.name} />
-                    <AvatarFallback className="text-[9px] font-bold bg-primary/5 text-primary">
+                  <Avatar
+                    className={cn(
+                      "size-8 border shadow-sm",
+                      isSelected ? "border-primary/30" : "border-border",
+                    )}
+                  >
+                    <AvatarImage
+                      src={artist.avatar}
+                      alt={artist.name}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="text-[10px] font-bold bg-secondary text-secondary-foreground">
                       {getInitialsTextAvartar(artist.name)}
                     </AvatarFallback>
                   </Avatar>
 
-                  <span
-                    className={cn(
-                      "text-xs flex-1 truncate",
-                      isSelected
-                        ? "font-bold"
-                        : "font-medium text-muted-foreground"
-                    )}
-                  >
-                    {artist.name}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={cn(
+                        "text-sm truncate leading-tight",
+                        // Thay đổi: Text đậm hơn, không dùng muted-foreground cho tên
+                        isSelected
+                          ? "font-bold text-primary"
+                          : "font-semibold text-foreground",
+                      )}
+                    >
+                      {artist.name}
+                    </p>
+                    {/* Có thể thêm sub-text nếu cần, ví dụ Role */}
+                    {/* <p className="text-[10px] text-muted-foreground truncate">Artist</p> */}
+                  </div>
 
-                  {isSelected && <Check className="size-3.5 stroke-3" />}
+                  {isSelected && (
+                    <div className="bg-primary/20 p-0.5 rounded-full shrink-0">
+                      <Check className="size-3.5 stroke-[3] text-primary" />
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="py-8 text-center text-[11px] text-muted-foreground font-medium italic">
-            Không có dữ liệu nghệ sĩ
+          <div className="py-8 text-center">
+            <p className="text-xs font-bold text-foreground">
+              Không tìm thấy nghệ sĩ
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Thử tìm kiếm từ khóa khác
+            </p>
           </div>
         )}
       </div>
 
       {/* Error Message */}
       {error && (
-        <p className="text-[10px] text-destructive font-bold ml-1">{error}</p>
+        <div className="flex items-center gap-1.5 text-destructive animate-in slide-in-from-left-1">
+          <span className="text-[11px] font-bold">{error}</span>
+        </div>
       )}
     </div>
   );

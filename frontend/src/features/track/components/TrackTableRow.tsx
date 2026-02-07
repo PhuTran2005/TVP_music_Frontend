@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import {
   MoreHorizontal,
   Edit,
@@ -8,6 +8,7 @@ import {
   Loader2,
   Copy,
   Disc,
+  RefreshCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,127 +20,233 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatDuration, STATUS_CONFIG } from "@/utils/track-helper";
-import { useAppDispatch } from "@/store/store";
-import { setIsPlaying } from "@/features/player";
+import { toast } from "sonner";
+import { Track } from "@/features/track/types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Link } from "react-router-dom";
 
-// Memoized để tối ưu hiệu năng
+interface TrackTableRowProps {
+  track: Track;
+  index: number;
+  isActive: boolean;
+  isPlaying: boolean;
+  isSelected: boolean;
+  onSelect: (id: string, checked: boolean) => void;
+  onPlay: () => void;
+  onEdit: (track: Track) => void;
+  onDelete: (track: Track) => void;
+  onRetry: (id: string) => Promise<void>;
+}
+
 export const TrackTableRow = memo(
-  ({ track, index, isActive, isPlaying, onPlay, onEdit, onDelete }: any) => {
-    const status =
-      STATUS_CONFIG[track.status as keyof typeof STATUS_CONFIG] ||
-      STATUS_CONFIG.pending;
+  ({
+    track,
+    index,
+    isActive,
+    isPlaying,
+    isSelected,
+    onSelect,
+    onPlay,
+    onEdit,
+    onDelete,
+    onRetry,
+  }: TrackTableRowProps) => {
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    const handleRetry = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isRetrying) return;
+      setIsRetrying(true);
+      try {
+        await onRetry(track._id);
+        toast.success("Retry queued");
+      } catch {
+        toast.error("Retry failed");
+        setIsRetrying(false);
+      }
+    };
 
     const handleCopyId = (e: React.MouseEvent) => {
       e.stopPropagation();
       navigator.clipboard.writeText(track._id);
-      // toast.success(...)
+      toast.success("Copied ID");
     };
-    const dispatch = useAppDispatch();
+
+    const statusKey = isRetrying ? "processing" : track.status;
+    const statusConfig = STATUS_CONFIG[statusKey as keyof typeof STATUS_CONFIG];
+
     return (
       <TableRow
         className={cn(
-          "group/row transition-colors",
-          isActive && "bg-secondary/50"
+          "group transition-colors border-b hover:bg-muted/40",
+          isActive && "bg-primary/5 hover:bg-primary/10",
+          isSelected && "bg-secondary/40",
+          track.status === "failed" &&
+            "bg-destructive/5 hover:bg-destructive/10"
         )}
       >
-        {/* Index / Playing Animation */}
-        <TableCell className="text-center w-12 shrink-0">
+        {/* Checkbox */}
+        <TableCell
+          className="w-10 text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={(checked) =>
+              onSelect(track._id, checked as boolean)
+            }
+          />
+        </TableCell>
+
+        {/* Index / Playing */}
+        <TableCell className="w-12 text-center">
           {isActive && isPlaying ? (
-            /* Music Visualizer chuyên nghiệp */
-            <div className="flex items-end justify-center gap-0.5 h-4 w-4 mx-auto">
+            <div className="flex items-end justify-center gap-0.5 h-4">
               <span className="w-0.5 bg-primary animate-music-bar-1" />
               <span className="w-0.5 bg-primary animate-music-bar-2" />
               <span className="w-0.5 bg-primary animate-music-bar-3" />
+              <span className="w-0.5 bg-primary animate-music-bar-4" />
+              <span className="w-0.5 bg-primary animate-music-bar-5" />
             </div>
           ) : (
-            <span
-              className={cn(
-                "text-xs font-mono text-muted-foreground",
-                isActive && "text-primary font-bold"
-              )}
-            >
+            <span className="text-xs font-mono text-muted-foreground">
               {(index + 1).toString().padStart(2, "0")}
             </span>
           )}
         </TableCell>
 
         {/* Track Info */}
-        <TableCell className="max-w-[300px]">
+        <TableCell className="py-2">
           <div className="flex items-center gap-3">
             <div
-              className="relative shrink-0 size-10 rounded-md overflow-hidden border border-border group/cover cursor-pointer"
-              onClick={() => onPlay(track)}
+              className="relative size-10 rounded-md overflow-hidden cursor-pointer"
+              onClick={onPlay}
             >
               <img
                 src={track.coverImage}
-                alt=""
                 className={cn(
-                  "size-full object-cover transition-transform duration-500 group-hover/cover:scale-110",
+                  "size-full object-cover transition",
                   isActive && "opacity-60"
                 )}
               />
-              <div
-                className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity"
-                onClick={() => dispatch(setIsPlaying(!isPlaying))}
-              >
-                {isActive && isPlaying ? (
-                  <Pause className="size-4 text-white fill-current" />
-                ) : (
-                  <Play className="size-4 text-white fill-current" />
-                )}
-              </div>
+              {track.status === "ready" && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition">
+                  {isActive && isPlaying ? (
+                    <Pause className="size-4 text-white fill-white" />
+                  ) : (
+                    <Play className="size-4 text-white fill-white" />
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex flex-col min-w-0">
-              <span
+
+            <div className="min-w-0">
+              <p
                 className={cn(
-                  "text-sm font-semibold truncate",
+                  "font-bold truncate",
                   isActive ? "text-primary" : "text-foreground"
                 )}
               >
                 {track.title}
-              </span>
-              <span className="text-xs text-muted-foreground truncate sm:hidden">
+              </p>
+              <Link
+                to={`/artist/${track.artist?.slug}`}
+                className="text-xs text-muted-foreground sm:hidden"
+              >
                 {track.artist?.name}
-              </span>
+              </Link>
             </div>
           </div>
         </TableCell>
 
-        {/* Artist - Hidden on Mobile */}
-        <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
-          <span className="hover:text-foreground cursor-pointer transition-colors line-clamp-1">
-            {track.artist?.name || "Unknown Artist"}
-          </span>
+        {/* Artist */}
+        <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+          <Link
+            to={`/artist/${track.artist?.slug}`}
+            className="hover:underline"
+          >
+            {track.artist?.name}
+          </Link>
+          {track.featuringArtists.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {" "}
+              (ft.{" "}
+              {track.featuringArtists
+                .map((artist) => (
+                  <Link
+                    key={artist._id}
+                    to={`/artist/${artist.slug}`}
+                    className="hover:underline"
+                  >
+                    {artist.name}
+                  </Link>
+                ))
+                .join(", ")}
+              )
+            </span>
+          )}
         </TableCell>
 
-        {/* Album - Hidden on Medium Screens */}
-        <TableCell className="hidden md:table-cell">
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Disc className="size-3 shrink-0 opacity-40" />
-            <span className="truncate max-w-[120px]">
-              {track.album?.title || "Single"}
-            </span>
+        {/* Album */}
+        <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Disc className="size-3 opacity-50" />
+            {track.album ? (
+              <Link
+                to={`/albums/${track.album.slug}`}
+                onClick={(e) => e.stopPropagation()}
+                className="hover:underline"
+              >
+                {track.album.title}
+              </Link>
+            ) : (
+              "Single"
+            )}
           </div>
         </TableCell>
 
         {/* Status */}
         <TableCell>
-          <Badge
-            variant="outline"
-            className={cn(
-              "font-xs font-semibold px-2 py-0 border-none shadow-none",
-              status.className
-            )}
-          >
-            {status.animate && <Loader2 className="mr-1 size-3 animate-spin" />}
-            {status.label}
-          </Badge>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className={cn("text-[10px]", statusConfig.className)}>
+                  {(statusConfig.animate || isRetrying) && (
+                    <Loader2 className="size-3 mr-1 animate-spin" />
+                  )}
+                  {statusConfig.label}
+                </Badge>
+              </TooltipTrigger>
+              {track.status === "failed" && track.errorReason && (
+                <TooltipContent className="max-w-xs text-xs">
+                  {track.errorReason}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+
+          {track.status === "failed" && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={handleRetry}
+              className="ml-1"
+            >
+              <RefreshCcw className="size-4" />
+            </Button>
+          )}
         </TableCell>
 
         {/* Duration */}
-        <TableCell className="hidden lg:table-cell font-mono text-xs text-muted-foreground">
+        <TableCell className="hidden lg:table-cell text-xs font-mono">
           {formatDuration(track.duration)}
         </TableCell>
 
@@ -147,27 +254,23 @@ export const TrackTableRow = memo(
         <TableCell className="text-right">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 rounded-full"
-              >
+              <Button size="icon" variant="ghost">
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onEdit(track)}>
-                <Edit className="mr-2 size-4" /> Edit Details
+                <Edit className="size-4 mr-2" /> Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleCopyId}>
-                <Copy className="mr-2 size-4" /> Copy ID
+                <Copy className="size-4 mr-2" /> Copy ID
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => onDelete(track)}
                 className="text-destructive"
+                onClick={() => onDelete(track)}
               >
-                <Trash2 className="mr-2 size-4" /> Remove
+                <Trash2 className="size-4 mr-2" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -176,3 +279,5 @@ export const TrackTableRow = memo(
     );
   }
 );
+
+TrackTableRow.displayName = "TrackTableRow";

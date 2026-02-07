@@ -2,12 +2,6 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 
 // Hooks
-import {
-  useAdminArtists,
-  useAdminDeleteArtist,
-  useAdminToggleStatus,
-} from "@/features/artist/hooks/index";
-import { useDebounce } from "@/hooks/useDebounce";
 import { APP_CONFIG } from "@/config/constants";
 
 // Components
@@ -19,39 +13,37 @@ import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import ArtistModal from "@/features/artist/components/artist-model";
 import ArtistCard from "@/features/artist/components/ArtistCard";
 import CardSkeleton from "@/components/ui/CardSkeleton";
-
-import type { Artist, ArtistFilterParams } from "@/features/artist/types";
 import { ArtistFilters } from "@/features/artist/components/ArtistFilters";
 
+import type { Artist } from "@/features/artist/types";
+import { useArtistAdmin } from "@/features/artist/hooks";
+
 const ArtistManagementPage = () => {
-  // --- STATE ---
-  const [params, setParams] = useState<ArtistFilterParams>({
-    page: 1,
-    limit: 12,
-    keyword: "",
-    isActive: undefined,
-    isVerified: undefined,
-    genreId: undefined,
-  });
+  // --- 1. USE HOOK (Central Logic) ---
+  const {
+    // Data
+    artists,
+    meta,
+    filterParams,
 
-  const debouncedKeyword = useDebounce(params.keyword || "", 500);
+    // States
+    isLoading,
+    isMutating,
+    isError,
 
-  // --- API ---
-  const { data, isLoading, isError } = useAdminArtists({
-    ...params,
-    keyword: debouncedKeyword,
-    genreId: params.genreId,
-  });
+    // Actions
+    setFilterParams,
+    handlePageChange,
+    toggleArtistStatus,
+    deleteArtist,
+  } = useArtistAdmin(APP_CONFIG.PAGINATION_LIMIT || 12);
 
-  const deleteMutation = useAdminDeleteArtist();
-  const toggleMutation = useAdminToggleStatus();
-
-  // --- MODAL STATE ---
+  // --- 2. LOCAL UI STATE (Modals) ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [artistToEdit, setArtistToEdit] = useState<Artist | null>(null);
   const [artistToDelete, setArtistToDelete] = useState<Artist | null>(null);
 
-  // --- HANDLERS ---
+  // --- 3. HANDLERS ---
   const handleCreate = () => {
     setArtistToEdit(null);
     setIsModalOpen(true);
@@ -64,72 +56,80 @@ const ArtistManagementPage = () => {
 
   const handleDelete = () => {
     if (artistToDelete) {
-      deleteMutation.mutate(artistToDelete._id, {
+      deleteArtist(artistToDelete._id, {
         onSuccess: () => setArtistToDelete(null),
       });
     }
   };
 
-  const artists = data?.data.data || [];
-  const totalPages = data?.data.meta.totalPages || 1;
-  const totalItems = data?.data.meta.totalItems || 0;
-  const pageSize = data?.data.meta.pageSize || APP_CONFIG.PAGINATION_LIMIT;
-  console.log(artists);
+  const handleToggle = (artist: Artist) => {
+    toggleArtistStatus(artist._id);
+  };
+
   if (isError) {
     return (
-      <div className="py-20">
+      <div className="pt-2 pb-10 flex items-center justify-center min-h-[50vh]">
         <MusicResult
           status="error"
           title="Failed to load artists"
-          description="Please try again later."
+          description="Please check your connection and try again."
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-12">
       {/* HEADER */}
       <PageHeader
-        title="Artists Management"
-        subtitle={`Managing ${totalItems} artist profiles.`}
+        title="Artist Profiles"
+        subtitle={`Managing ${meta.totalItems} profiles across the platform.`}
         action={
           <Button
             onClick={handleCreate}
-            className="shadow-lg shadow-primary/20"
+            className="shadow-md bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6"
           >
-            <Plus className="size-4 mr-2" /> Add Artist
+            <Plus className="size-4 mr-2" /> New Artist
           </Button>
         }
       />
 
-      {/* FILTER */}
-      <ArtistFilters params={params} setParams={setParams} />
+      {/* FILTER SECTION */}
+      {/* Truyền trực tiếp params và setter từ hook */}
+      <ArtistFilters params={filterParams} setParams={setFilterParams} />
 
-      {/* CONTENT */}
+      {/* CONTENT GRID */}
       {isLoading ? (
-        <CardSkeleton count={APP_CONFIG.PAGINATION_LIMIT} />
+        <CardSkeleton count={meta.pageSize} />
       ) : artists.length === 0 ? (
-        <div className="py-12">
+        <div className="py-16 bg-muted/5 rounded-xl border border-dashed border-border">
           <MusicResult
             status="empty"
             title="No artists found"
-            description="Try adjusting your filters or search criteria."
+            description="Try adjusting your filters or search keyword."
             secondaryAction={{
               label: "Clear Filters",
-              onClick: () => setParams({ page: 1, limit: 12, keyword: "" }),
+              onClick: () =>
+                setFilterParams((prev) => ({
+                  ...prev,
+                  page: 1,
+                  keyword: "",
+                  nationality: undefined,
+                  isVerified: undefined,
+                  isActive: undefined,
+                })),
             }}
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 animate-in fade-in duration-500">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6 animate-in fade-in duration-500">
           {artists.map((artist: Artist) => (
             <ArtistCard
               key={artist._id}
               artist={artist}
               onEdit={() => handleEdit(artist)}
               onDelete={() => setArtistToDelete(artist)}
-              onToggle={() => toggleMutation.mutate(artist._id)}
+              onToggle={() => handleToggle(artist)}
             />
           ))}
         </div>
@@ -137,13 +137,13 @@ const ArtistManagementPage = () => {
 
       {/* PAGINATION */}
       {!isLoading && artists.length > 0 && (
-        <div className="pt-4">
+        <div className="pt-6 border-t border-border">
           <Pagination
-            currentPage={params.page || 1}
-            totalPages={totalPages}
-            onPageChange={(p) => setParams((prev) => ({ ...prev, page: p }))}
-            totalItems={totalItems}
-            itemsPerPage={pageSize}
+            currentPage={meta.page}
+            totalPages={meta.totalPages}
+            onPageChange={handlePageChange}
+            totalItems={meta.totalItems}
+            itemsPerPage={meta.pageSize || 1}
           />
         </div>
       )}
@@ -153,21 +153,29 @@ const ArtistManagementPage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         artistToEdit={artistToEdit}
+        // Truyền trạng thái đang xử lý để disable nút Save
+        isPending={isMutating}
       />
 
       <ConfirmationModal
         isOpen={!!artistToDelete}
         onCancel={() => setArtistToDelete(null)}
         onConfirm={handleDelete}
-        title="Delete Artist?"
+        title="Delete Artist Profile?"
+        // Truyền trạng thái đang xử lý để disable nút Delete
+        isLoading={isMutating}
         description={
           <span>
-            Are you sure you want to delete{" "}
-            <strong>{artistToDelete?.name}</strong>? This action cannot be
-            undone.
+            Are you sure you want to permanently delete{" "}
+            <strong className="text-foreground">{artistToDelete?.name}</strong>?
+            <br />
+            <span className="text-destructive font-bold text-sm mt-2 block bg-destructive/10 p-2 rounded border border-destructive/20">
+              This action cannot be undone. All associated tracks might be
+              affected.
+            </span>
           </span>
         }
-        confirmLabel="Delete Artist"
+        confirmLabel="Yes, Delete"
         isDestructive
       />
     </div>

@@ -40,7 +40,7 @@ const ArtistPage = () => {
   const totalPages = data?.data.meta.totalPages || 1;
   const totalItems = data?.data.meta.totalItems || 0;
   const pageSize = data?.data.meta.pageSize || APP_CONFIG.PAGINATION_LIMIT;
-  console.log(artists);
+
   if (isError) {
     return (
       <div className="py-20">
@@ -61,40 +61,61 @@ const ArtistPage = () => {
       {/* FILTER */}
       <ArtistFilters params={params} setParams={setParams} />
 
-      {/* CONTENT */}
-      {isLoading ? (
-        <CardSkeleton count={APP_CONFIG.PAGINATION_LIMIT} />
-      ) : artists.length === 0 ? (
-        <div className="py-12">
-          <MusicResult
-            status="empty"
-            title="No artists found"
-            description="Try adjusting your filters or search criteria."
-            secondaryAction={{
-              label: "Clear Filters",
-              onClick: () => setParams({ page: 1, limit: 12, keyword: "" }),
-            }}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 animate-in fade-in duration-500">
-          {artists.map((artist: Artist) => (
-            <PublicArtistCard key={artist._id} artist={artist} />
-          ))}
-        </div>
-      )}
+      {/* ================= CONTENT ================= */}
+      {/* 🔥 FIX: Added mx-auto */}
+      <section className="container mx-auto px-4 sm:px-6 py-12">
+        {isLoading ? (
+          <CardSkeleton count={pageSize} />
+        ) : artists.length === 0 ? (
+          <div className="flex justify-center py-20">
+            <MusicResult
+              status="empty"
+              title="No artists found"
+              description="Try adjusting filters or search criteria."
+              secondaryAction={{
+                label: "Clear Filters",
+                onClick: () =>
+                  setParams({
+                    page: 1,
+                    limit: APP_CONFIG.PAGINATION_LIMIT || 12,
+                    keyword: "",
+                  }),
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            className="
+              grid gap-6
+              grid-cols-1
+              sm:grid-cols-3
+              md:grid-cols-4
+              lg:grid-cols-5
+              2xl:grid-cols-6
+              animate-in fade-in duration-500
+            "
+          >
+            {artists.map((artist) => (
+              <PublicArtistCard key={artist._id} artist={artist} />
+            ))}
+          </div>
+        )}
+      </section>
 
-      {/* PAGINATION */}
+      {/* ================= PAGINATION ================= */}
       {!isLoading && artists.length > 0 && (
-        <div className="pt-4">
-          <Pagination
-            currentPage={params.page || 1}
-            totalPages={totalPages}
-            onPageChange={(p) => setParams((prev) => ({ ...prev, page: p }))}
-            totalItems={totalItems}
-            itemsPerPage={pageSize}
-          />
-        </div>
+        <section>
+          {/* 🔥 FIX: Added mx-auto */}
+          <div className="container mx-auto px-4 sm:px-6 py-6 flex justify-center">
+            <Pagination
+              currentPage={params.page || 1}
+              totalPages={totalPages}
+              onPageChange={(page) => setParams((prev) => ({ ...prev, page }))}
+              totalItems={totalItems}
+              itemsPerPage={pageSize}
+            />
+          </div>
+        </section>
       )}
     </div>
   );

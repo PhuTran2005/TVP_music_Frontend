@@ -17,9 +17,9 @@ If you are developing a production application, we recommend updating the config
 
 ```js
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(["dist"]),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ["**/*.{ts,tsx}"],
     extends: [
       // Other configs...
 
@@ -34,40 +34,56 @@ export default defineConfig([
     ],
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
         tsconfigRootDir: import.meta.dirname,
       },
       // other options...
     },
   },
-])
+]);
 ```
 
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js
 // eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+import reactX from "eslint-plugin-react-x";
+import reactDom from "eslint-plugin-react-dom";
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(["dist"]),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ["**/*.{ts,tsx}"],
     extends: [
       // Other configs...
       // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
+      reactX.configs["recommended-typescript"],
       // Enable lint rules for React DOM
       reactDom.configs.recommended,
     ],
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
         tsconfigRootDir: import.meta.dirname,
       },
       // other options...
     },
   },
-])
+]);
 ```
+
+Tuyệt vời. Để đạt chuẩn "Production/Enterprise" (Doanh nghiệp), phong cách comment code cần tuân thủ các nguyên tắc sau:
+
+JSDoc (/\*_ ... _/) cho các khối chính: Dùng cho Config, Function, Type xuất ra ngoài (export). Giúp IDE (VSCode) hiển thị gợi ý (Intellisense) khi rê chuột vào.
+
+Section Dividers (// ====== ...): Phân chia code thành các vùng logic rõ ràng, giúp mắt dễ quét (scan) khi file dài.
+
+"Why" over "What": Comment giải thích TẠI SAO làm thế (Logic nghiệp vụ/Bảo mật), thay vì giải thích code làm gì (vì code đã tự nói lên điều đó).
+
+English/Vietnamese Consistent: Ở đây tôi sẽ viết comment bằng Tiếng Việt chuẩn kỹ thuật để team của bạn dễ hiểu nhất, nhưng giữ văn phong chuyên nghiệp.
+Loại Hook,Quy tắc đặt tên,Ví dụ thực tế,Ý nghĩa ngầm định
+Data Fetching,use[Resource]Query use[Resource]List,useAlbumsQuery useTracksList,"Tự động fetch, cache data, trả về loading/data."
+Data Single,use[Resource]Detail,useAlbumDetail,"Lấy 1 item, thường dựa trên ID/Slug."
+Data Mutation,use[Resource]Mutation use[Action][Resource],useDeleteAlbum useAlbumMutations,Trả về hàm trigger. Không tự chạy.
+UI Logic,use[Context]Params,useTableParams,Quản lý URL search params.
+Utility,use[Tech],"useDebounce, useClickOutside",Helper thuần túy.

@@ -5,11 +5,11 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 // Redux & API
-import { useAppDispatch } from "@/store/store";
 import authApi from "@/features/auth/api/authApi";
 import { loginSchema, type LoginInput } from "../schemas/auth.schema";
 import { login } from "@/features/auth/slice/authSlice";
 import type { ApiErrorResponse } from "@/types";
+import { useAppDispatch } from "@/store/hooks";
 
 export const useLogin = () => {
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ export const useLogin = () => {
         login({
           accessToken: res.data.accessToken,
           user: res.data.user,
-        })
+        }),
       );
       if (res.data.user.mustChangePassword) {
         toast.warning("Yêu cầu bảo mật", {

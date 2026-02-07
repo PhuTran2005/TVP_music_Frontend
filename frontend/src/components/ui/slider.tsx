@@ -42,7 +42,7 @@ function Slider({
       <SliderPrimitive.Track
         data-slot="slider-track"
         className={cn(
-          "bg-secondary/40 relative grow overflow-hidden rounded-full transition-all duration-300",
+          "bg-foreground relative grow overflow-hidden rounded-full transition-all duration-300",
           // Desktop: Hover vào thì Track dày lên
           "data-[orientation=horizontal]:h-1 data-[orientation=horizontal]:w-full group-hover:data-[orientation=horizontal]:h-1.5",
           // Mobile: Khi chạm (active) thì Track cũng dày lên
