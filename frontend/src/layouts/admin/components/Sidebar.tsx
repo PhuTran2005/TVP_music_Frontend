@@ -1,5 +1,5 @@
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { ADMIN_PATHS } from "@/config/paths";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ import {
   KeyboardMusic,
   UserCheck,
 } from "lucide-react";
+import Avatar, { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // --- Menu Data giữ nguyên ---
 const sidebarGroups = [
@@ -124,23 +125,37 @@ const Sidebar: React.FC<SidebarProps> = ({
         isSidebarOpen
           ? "w-64 translate-x-0 shadow-xl lg:shadow-none"
           : "-translate-x-full lg:translate-x-0",
-        isCollapsed ? "lg:w-[70px]" : "lg:w-64"
+        isCollapsed ? "lg:w-[70px]" : "lg:w-64",
       )}
     >
       {/* --- HEADER --- */}
       <div
         className={cn(
           "flex h-16 items-center shrink-0 border-b border-sidebar-border",
-          isCollapsed ? "justify-center" : "justify-between px-4"
+          isCollapsed ? "justify-center" : "justify-between px-4",
         )}
       >
-        <div className="flex items-center gap-2 overflow-hidden">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shadow-sm">
-            M
-          </div>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/"
+            className="group flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+          >
+            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-tr from-primary/20 to-primary/10 border border-primary/20 shadow-sm transition-transform duration-300 group-hover:scale-105 group-hover:shadow-primary/30">
+              <Avatar className="size-full rounded-xl">
+                <AvatarImage
+                  src="https://res.cloudinary.com/dc5rfjnn5/image/upload/v1770807338/LOGO_o4n02n.png"
+                  alt="Logo"
+                  className="object-cover p-1" // Padding nhẹ để logo không bị sát viền
+                />
+                <AvatarFallback className="bg-transparent font-bold text-primary">
+                  TVP
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          </Link>
           {!isCollapsed && (
-            <span className="text-lg font-bold tracking-tight text-sidebar-foreground">
-              MusicHub
+            <span className="text-lg font-bold tracking-tight text-primary">
+              TVP MUSIC
             </span>
           )}
         </div>
@@ -179,7 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       isActive
                         ? "bg-sidebar-accent text-sidebar-primary"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                      isCollapsed && "justify-center px-0 w-10 h-10 mx-auto"
+                      isCollapsed && "justify-center px-0 w-10 h-10 mx-auto",
                     )}
                   >
                     {/* Active Indicator Bar (Left) */}
@@ -192,7 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         "size-5 shrink-0 transition-colors",
                         isActive
                           ? "text-sidebar-primary"
-                          : "group-hover:text-sidebar-primary"
+                          : "group-hover:text-sidebar-primary",
                       )}
                     />
                     {!isCollapsed && (
@@ -213,7 +228,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClick={toggleSidebar}
           className={cn(
             "hidden lg:flex w-full text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            isCollapsed ? "justify-center px-0" : "justify-start gap-3"
+            isCollapsed ? "justify-center px-0" : "justify-start gap-3",
           )}
         >
           {isCollapsed ? (
@@ -229,7 +244,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           className={cn(
             "w-full text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            isCollapsed ? "justify-center px-0" : "justify-start gap-3"
+            isCollapsed ? "justify-center px-0" : "justify-start gap-3",
           )}
         >
           <div className="relative size-5 shrink-0">

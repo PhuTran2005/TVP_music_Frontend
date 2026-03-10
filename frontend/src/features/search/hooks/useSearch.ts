@@ -1,31 +1,33 @@
 // src/features/search/hooks/useSearch.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { searchApi } from "../api/searchApi";
-import { useDebounce } from "@/hooks/useDebounce"; // Import hook trên
+import { useDebounce } from "@/hooks/useDebounce";
 
 export const useSearch = (query: string) => {
-  // Delay 500ms: Chỉ gọi API khi user ngừng gõ 0.5s
-  const debouncedQuery = useDebounce(query, 500);
+  // Delay 400ms mang lại cảm giác phản hồi nhanh hơn 500ms
+  const debouncedQuery = useDebounce(query, 400);
 
   return useQuery({
-    // Cache key phụ thuộc vào debouncedQuery.
-    // Key đổi -> React Query tự fetch lại.
     queryKey: ["search", debouncedQuery],
-
-    queryFn: () => searchApi.search({ q: debouncedQuery, limit: 5 }),
+    queryFn: () => searchApi.search({ q: debouncedQuery, limit: 10 }), // Tăng limit lên để list trả về phong phú hơn
 
     // --- TỐI ƯU UX ---
 
-    // 1. Chỉ fetch khi từ khóa có ít nhất 2 ký tự (đỡ spam rác)
-    enabled: debouncedQuery.length >= 2,
+    // 1. Cho phép tìm kiếm ngay cả với 1 ký tự (Ví dụ: "V" của BTS)
+    // Dùng .trim() để tránh việc user chỉ gõ dấu cách " " làm gọi API lỗi
+    enabled: debouncedQuery.trim().length > 0,
 
-    // 2. Giữ kết quả cũ khi đang fetch từ khóa mới (tránh layout shift / nhấp nháy)
+    // 2. Giữ kết quả cũ trên màn hình trong lúc Fetching data mới -> Tránh chớp nháy (Layout Shift)
     placeholderData: keepPreviousData,
 
-    // 3. Cache kết quả trong 5 phút (khớp với Redis Backend)
-    staleTime: 5 * 60 * 1000,
+    // 3. StaleTime: Dữ liệu được coi là "tươi" trong 2 phút (Search thay đổi liên tục, không nên để 5 phút)
+    staleTime: 2 * 60 * 1000,
 
-    // 4. Không retry nếu lỗi 404/500 (Search lỗi thì thôi, không cần thử lại ngay)
+    // 4. Garbage Collection Time (Cache Time cũ): Giữ kết quả trong bộ nhớ 15 phút.
+    // Giúp UX cực mượt khi user bấm Back/Forward trình duyệt.
+    gcTime: 15 * 60 * 1000,
+
+    // 5. Không retry nếu lỗi 404/500 để tránh spam server khi đang sập
     retry: false,
   });
 };

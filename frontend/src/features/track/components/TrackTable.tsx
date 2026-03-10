@@ -1,5 +1,4 @@
-import React from "react";
-import { type Track } from "../types";
+import React, { useCallback, useMemo } from "react";
 import { TrackTableRow } from "./TrackTableRow";
 import {
   Table,
@@ -14,16 +13,18 @@ import TableSkeleton from "@/components/ui/TableSkeleton";
 import { setQueue, setIsPlaying } from "@/features/player";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { ITrack } from "@/features/track/types";
+import { Clock, Play } from "lucide-react";
 
 interface TrackTableProps {
-  tracks: Track[];
+  tracks: ITrack[];
   isLoading: boolean;
   selectedIds: string[];
   onSelectOne: (id: string, checked: boolean) => void;
   onSelectAll: (checked: boolean) => void;
-  onEdit: (track: Track) => void;
-  onRetry: (track: Track) => void;
-  onDelete: (track: Track) => void;
+  onEdit: (track: ITrack) => void;
+  onRetry: (track: ITrack) => Promise<void>; // Chuyển thành Promise để đồng bộ với state nội bộ của Row
+  onDelete: (track: ITrack) => void;
   startIndex: number;
 }
 
@@ -41,58 +42,72 @@ export const TrackTable: React.FC<TrackTableProps> = ({
   const dispatch = useAppDispatch();
   const { currentTrack, isPlaying } = useAppSelector((state) => state.player);
 
-  const isAllSelected =
-    tracks.length > 0 && selectedIds.length === tracks.length;
+  // Memoize check all state
+  const isAllSelected = useMemo(
+    () => tracks.length > 0 && selectedIds.length === tracks.length,
+    [tracks.length, selectedIds.length],
+  );
 
   /**
-   * ✅ PLAY LOGIC CHUẨN SPOTIFY
+   * ✅ PLAY LOGIC CHUẨN SPOTIFY (Sử dụng useCallback để tối ưu re-render)
    */
-  const handlePlayTrack = (track: Track, index: number) => {
-    // Click lại bài đang active → toggle play / pause
-    if (currentTrack?._id === track._id) {
-      dispatch(setIsPlaying(!isPlaying));
-      return;
-    }
+  const handlePlayTrack = useCallback(
+    (track: ITrack, index: number) => {
+      // 1. Nếu click vào bài đang phát -> Toggle Play/Pause
+      if (currentTrack?._id === track._id) {
+        dispatch(setIsPlaying(!isPlaying));
+        return;
+      }
 
-    // Click bài khác → set queue + play từ index đó
-    dispatch(
-      setQueue({
-        tracks,
-        startIndex: index,
-      }),
-    );
-  };
+      // 2. Nếu click bài khác -> Thay đổi toàn bộ danh sách phát bắt đầu từ vị trí bài đó
+      dispatch(
+        setQueue({
+          tracks,
+          startIndex: index,
+        }),
+      );
+    },
+    [currentTrack?._id, isPlaying, tracks, dispatch],
+  );
 
   return (
-    <div className="relative w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <div className="relative w-full overflow-hidden rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm shadow-xl transition-all">
       <Table>
-        {/* ================= HEADER ================= */}
-        <TableHeader className="bg-secondary/50">
-          <TableRow>
+        {/* ================= HEADER (Layout Spotify-Style) ================= */}
+        <TableHeader className="bg-muted/40 border-b border-border/50">
+          <TableRow className="hover:bg-transparent">
             <TableHead className="w-10 px-2 text-center">
               <Checkbox
                 checked={isAllSelected}
                 onCheckedChange={(val) => onSelectAll(val as boolean)}
+                className="transition-transform active:scale-90"
               />
             </TableHead>
-            <TableHead className="w-12 text-center text-xs font-black uppercase text-muted-foreground">
+
+            <TableHead className="w-12 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
               #
             </TableHead>
-            <TableHead className="text-xs font-black uppercase text-muted-foreground">
-              Track
+
+            <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
+              Track Details
             </TableHead>
-            <TableHead className="hidden sm:table-cell text-xs font-black uppercase text-muted-foreground">
+
+            <TableHead className="hidden sm:table-cell text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
               Artist
             </TableHead>
-            <TableHead className="hidden md:table-cell text-xs font-black uppercase text-muted-foreground">
-              Album
+
+            <TableHead className="hidden md:table-cell text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
+              Album / Release
             </TableHead>
-            <TableHead className="text-xs font-black uppercase text-muted-foreground">
-              Status
+
+            <TableHead className="w-[140px] text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
+              Process Status
             </TableHead>
-            <TableHead className="hidden lg:table-cell text-xs font-black uppercase text-muted-foreground">
-              Time
+
+            <TableHead className="hidden lg:table-cell w-20 text-center text-muted-foreground/70">
+              <Clock className="size-3.5 mx-auto" />
             </TableHead>
+
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
@@ -100,7 +115,7 @@ export const TrackTable: React.FC<TrackTableProps> = ({
         {/* ================= BODY ================= */}
         <TableBody>
           {isLoading ? (
-            <TableSkeleton rows={8} cols={7} />
+            <TableSkeleton rows={8} cols={8} hasAvatar={true} />
           ) : tracks.length > 0 ? (
             tracks.map((track, i) => (
               <TrackTableRow
@@ -118,18 +133,24 @@ export const TrackTable: React.FC<TrackTableProps> = ({
               />
             ))
           ) : (
-            <TableRow>
-              <TableCell colSpan={8} className="h-64 text-center">
-                <MusicResult
-                  status="empty"
-                  title="No tracks found"
-                  description="Try adjusting filters or upload a new track."
-                />
+            <TableRow className="hover:bg-transparent border-none">
+              <TableCell colSpan={8} className="h-[400px] text-center p-0">
+                <div className="flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-500">
+                  <MusicResult
+                    status="empty"
+                    title="Library empty"
+                    description="No tracks match your current selection or filters."
+                  />
+                </div>
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
+
+      {/* 💡 Overlay mỏng phía dưới nếu đang fetching dữ liệu mới */}
     </div>
   );
 };
+
+TrackTable.displayName = "TrackTable";

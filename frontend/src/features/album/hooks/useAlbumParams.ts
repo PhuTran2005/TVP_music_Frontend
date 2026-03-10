@@ -2,7 +2,7 @@ import { useMemo, useCallback } from "react";
 import { useQueryParams } from "@/hooks/useQueryParams"; // Import Generic Hook
 import { AlbumFilterParams } from "../types";
 
-const ALLOWED_SORTS = ["newest", "oldest", "popular", "a-z"] as const;
+const ALLOWED_SORTS = ["newest", "oldest", "popular", "name"] as const;
 const ALLOWED_TYPES = ["album", "single", "ep", "compilation", "all"] as const;
 
 // Default values
@@ -24,7 +24,7 @@ export const useAlbumParams = (initialLimit = 10) => {
     ...DEFAULT_ALBUM_PARAMS,
     limit: initialLimit,
   });
-
+  console.log("Raw URL params:", rawParams);
   // 2. Validate & Override (Logic đặc thù của Album)
   // Generic hook chỉ parse cơ bản, ở đây ta validate kỹ hơn (Enum check)
   const filterParams = useMemo((): AlbumFilterParams => {

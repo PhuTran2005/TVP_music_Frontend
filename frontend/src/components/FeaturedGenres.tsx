@@ -4,20 +4,20 @@ import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Genre } from "@/features/genre/types";
-import { useGenres } from "@/features/genre/hooks/useGenreAdmin";
 import { SectionHeader } from "@/pages/client/home/SectionHeader";
 import { HorizontalScroll } from "@/pages/client/home/HorizontalScroll";
 import { GenreCard } from "@/features/genre/components/GenreCard";
+import { useGenresQuery } from "@/features/genre/hooks/useGenresQuery";
 
 export function FeaturedGenres() {
-  const { data, isLoading } = useGenres({
+  const { data, isLoading } = useGenresQuery({
     page: 1,
     limit: 8,
     isTrending: true,
     sort: "priority",
   });
 
-  const genres = data?.data.data as Genre[] | undefined;
+  const genres = data?.genres as Genre[] | undefined;
 
   return (
     // 🔥 1. Thêm border-y và nền nhẹ để tách biệt section (Visual Separation)

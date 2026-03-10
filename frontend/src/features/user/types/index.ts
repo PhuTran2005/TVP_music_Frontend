@@ -94,5 +94,8 @@ export interface UserFilterParams {
   page?: number;
   limit?: number;
   keyword?: string;
+  sort?: string;
   role?: string;
+  isVerified?: boolean;
+  isActive?: boolean;
 }

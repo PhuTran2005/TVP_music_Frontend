@@ -1,6 +1,6 @@
 import { Album } from "@/features/album/types";
 import type { Genre } from "@/features/genre/types";
-import { Track } from "@/features/track/types";
+import { ITrack } from "@/features/track/types";
 import type { User } from "@/features/user";
 
 export interface SocialLinks {
@@ -47,7 +47,7 @@ export interface Artist {
 }
 export interface ArtistDetail {
   albums: Album[];
-  topTracks: Track[];
+  topTracks: ITrack[];
   artist: Artist;
 }
 export interface ArtistFilterParams {

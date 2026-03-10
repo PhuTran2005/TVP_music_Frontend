@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Controller, useWatch } from "react-hook-form";
 import {
@@ -12,10 +12,16 @@ import {
   ShieldAlert,
   AudioLines,
   AlertCircle,
+  Loader2,
+  Calendar,
+  ListOrdered,
+  Copyright,
+  ScanBarcode,
+  Type,
+  Tags,
+  AlignLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type Track } from "../types";
-import { type TrackFormValues } from "@/features/track/schemas/track.schema";
 
 // UI Components
 import { ArtistSelector } from "@/features/artist/components/ArtistSelector";
@@ -30,14 +36,14 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
-// Hook
 import { useTrackForm } from "../hooks/useTrackForm";
+import { ITrack } from "@/features/track/types";
 
 interface TrackModalProps {
   isOpen: boolean;
   onClose: () => void;
-  trackToEdit?: Track | null;
-  onSubmit: (data: TrackFormValues) => void;
+  trackToEdit?: ITrack | null;
+  onSubmit: (data: FormData) => Promise<void>;
   isPending: boolean;
 }
 
@@ -50,320 +56,425 @@ const TrackModal: React.FC<TrackModalProps> = ({
 }) => {
   const {
     form,
-    imagePreview,
-    audioName,
-    duration,
+    handleSubmit,
     handleAudioChange,
+    imagePreview,
+    audioPreview,
     formatDuration,
-  } = useTrackForm(trackToEdit, isOpen);
+    isSubmitting: isFormSubmitting,
+  } = useTrackForm({
+    trackToEdit,
+    onSubmit,
+  });
 
   const {
     register,
-    handleSubmit,
     setValue,
     control,
     formState: { errors },
   } = form;
 
+  const isEditing = !!trackToEdit;
   const selectedMainArtist = useWatch({ control, name: "artistId" });
   const isPublic = useWatch({ control, name: "isPublic" });
   const isExplicit = useWatch({ control, name: "isExplicit" });
+  const duration = useWatch({ control, name: "duration" });
 
   const mainArtistValue = selectedMainArtist ? [selectedMainArtist] : [];
+  const isLoading = isPending || isFormSubmitting;
 
-  const onError = (errors: any) => {
-    console.log("Form Validation Errors:", errors);
-  };
+  useEffect(() => {
+    if (isOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "unset";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // --- Helper Components ---
-
-  const FormLabel = ({
-    children,
-    required,
-  }: {
-    children: React.ReactNode;
-    required?: boolean;
-  }) => (
-    // Tăng độ đậm của Label (text-foreground/80 thay vì muted)
-    <Label className="text-[11px] font-bold uppercase text-foreground/80 tracking-wider ml-0.5 mb-2 block">
-      {children}{" "}
-      {required && <span className="text-destructive text-sm">*</span>}
+  // --- Helpers Chuẩn UI Đồng Bộ với GenreModal ---
+  const FormLabel = ({ children, required, icon: Icon }: any) => (
+    <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 flex items-center gap-1.5 w-fit">
+      {Icon && <Icon className="size-3.5" />}
+      {children}
+      {required && (
+        <span className="text-destructive text-sm leading-none">*</span>
+      )}
     </Label>
   );
 
   const ErrorMessage = ({ message }: { message?: string }) => {
     if (!message) return null;
     return (
-      <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-destructive animate-in slide-in-from-left-1 fade-in duration-300">
+      <p className="text-[12px] font-medium text-destructive mt-1 flex items-center gap-1.5 animate-in slide-in-from-top-1">
         <AlertCircle className="size-3.5 shrink-0" />
         <span>{message}</span>
-      </div>
+      </p>
     );
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden">
-      {/* Backdrop: Tối hơn để tăng độ sâu */}
-      <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
-        onClick={onClose}
-      />
+  const inputClass =
+    "h-11 bg-transparent border-input rounded-md text-[14px] font-medium focus-visible:ring-1 focus-visible:ring-primary transition-all";
 
-      {/* Modal Container: Thêm border rõ ràng và shadow đậm */}
-      <div className="relative z-[101] w-full max-w-5xl bg-background border border-border shadow-2xl flex flex-col h-full sm:h-[90vh] max-h-[90vh] rounded-2xl animate-in zoom-in-95 duration-200 overflow-hidden ring-1 ring-white/10">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      {/* Overlay */}
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-300" />
+
+      {/* Modal Content */}
+      <div className="relative z-[101] w-full max-w-6xl bg-background border border-border rounded-xl shadow-2xl flex flex-col h-[95vh] max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden">
         {/* --- HEADER --- */}
-        <header className="px-6 py-4 border-b border-border bg-card/50 flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-background shrink-0 z-20">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/10 shadow-sm">
               <Music className="size-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground leading-tight">
-                {trackToEdit ? "Metadata Editor" : "Studio Upload"}
+              <h3 className="text-lg font-bold leading-none text-foreground uppercase tracking-tight">
+                {isEditing ? "Cập Nhật Bài Hát" : "Tải Nhạc Lên Hệ Thống"}
               </h3>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="flex size-2 rounded-full bg-green-500 animate-pulse" />
-                <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-widest">
-                  {trackToEdit
-                    ? `ID: ${trackToEdit._id.slice(-8)}`
-                    : "Drafting Mode"}
-                </p>
-              </div>
+              <p className="text-[13px] font-medium text-muted-foreground mt-1 hidden sm:block">
+                {isEditing
+                  ? "Chỉnh sửa thông tin chi tiết và tệp âm thanh của bài hát."
+                  : "Thêm một bài hát mới vào cơ sở dữ liệu hệ thống."}
+              </p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="rounded-full hover:bg-destructive/10 hover:text-destructive active:scale-95 transition-colors"
+            disabled={isLoading}
+            className="rounded-md size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <X className="size-5" />
           </Button>
-        </header>
+        </div>
 
         {/* --- BODY --- */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-secondary/5">
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10 relative p-4 sm:p-6 lg:p-8">
           <form
             id="track-form"
-            onSubmit={handleSubmit(onSubmit, onError)}
-            className="p-4 sm:p-6 md:p-8"
+            onSubmit={handleSubmit}
+            className="flex flex-col lg:flex-row gap-6 lg:gap-8"
           >
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* === SIDEBAR (Media) === */}
-              <aside className="lg:col-span-4 space-y-6">
-                {/* Artwork */}
-                <div className="bg-card p-4 rounded-xl border border-border shadow-sm">
-                  <FormLabel>Cover Artwork</FormLabel>
-                  <div
-                    className={cn(
-                      "relative group aspect-square rounded-xl border-2 border-dashed overflow-hidden transition-all cursor-pointer shadow-inner",
-                      errors.coverImage
-                        ? "border-destructive bg-destructive/5"
-                        : "border-border hover:border-primary hover:bg-secondary/50 bg-secondary/20"
-                    )}
-                  >
-                    {imagePreview ? (
-                      <>
-                        <img
-                          src={imagePreview}
-                          alt="Cover"
-                          className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        />
-                        {/* Gradient Overlay for text readability */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                        <Disc className="size-16 mb-4 opacity-50 text-foreground/20" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/60">
-                          Upload Image
-                        </span>
-                      </div>
-                    )}
-                    {/* Overlay Upload Button */}
-                    <label className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer z-10">
-                      <div className="bg-background/80 backdrop-blur-md text-foreground p-3 rounded-full shadow-lg transform group-hover:scale-110 transition-transform">
-                        <Camera className="size-6" />
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f)
-                            setValue("coverImage", f, {
-                              shouldDirty: true,
-                              shouldValidate: true,
-                            });
-                        }}
+            {/* === SIDEBAR (Media & Settings) === */}
+            <aside className="w-full lg:w-[340px] shrink-0 space-y-6">
+              {/* Artwork */}
+              <div className="bg-background p-6 rounded-xl border border-border shadow-sm">
+                <FormLabel icon={Camera}>Ảnh Bìa Nhạc</FormLabel>
+                <div
+                  className={cn(
+                    "relative mt-2 group aspect-square w-[200px] lg:w-full mx-auto rounded-xl border-2 border-dashed overflow-hidden flex items-center justify-center cursor-pointer transition-all duration-300",
+                    errors.coverImage
+                      ? "border-destructive/50 bg-destructive/5"
+                      : "border-muted-foreground/20 bg-secondary/10 hover:border-primary/50 hover:bg-primary/5 shadow-sm hover:shadow-md",
+                  )}
+                >
+                  {imagePreview ? (
+                    <>
+                      <img
+                        src={imagePreview}
+                        alt="Cover Preview"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
-                    </label>
-                  </div>
-                  <ErrorMessage
-                    message={errors.coverImage?.message as string}
-                  />
-                </div>
-
-                {/* Audio File */}
-                <div className="bg-card p-4 rounded-xl border border-border shadow-sm">
-                  <FormLabel required>Audio Source</FormLabel>
-                  <div
-                    className={cn(
-                      "relative p-4 rounded-xl border-2 border-dashed transition-all group active:scale-[0.99] cursor-pointer",
-                      errors.audio
-                        ? "border-destructive bg-destructive/5"
-                        : "border-border hover:border-primary hover:bg-secondary/50 bg-secondary/20"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          "size-12 rounded-lg flex items-center justify-center shrink-0 shadow-sm border border-border/50",
-                          duration > 0
-                            ? "bg-primary/10 text-primary"
-                            : "bg-background text-muted-foreground"
-                        )}
-                      >
-                        {duration > 0 ? (
-                          <AudioLines className="size-6" />
-                        ) : (
-                          <FileAudio className="size-6" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={cn(
-                            "text-sm font-bold truncate leading-tight",
-                            errors.audio
-                              ? "text-destructive"
-                              : "text-foreground"
-                          )}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white backdrop-blur-[2px]">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="relative cursor-pointer font-semibold shadow-md pointer-events-none"
                         >
-                          {audioName || "Select Audio File"}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <Badge
-                            variant="outline"
-                            className="h-5 text-[9px] px-1.5 font-mono text-muted-foreground bg-background"
-                          >
-                            {duration > 0
-                              ? formatDuration(duration)
-                              : "MP3, WAV, FLAC"}
-                          </Badge>
-                        </div>
+                          <Camera className="w-4 h-4 mr-2" /> Đổi ảnh
+                        </Button>
                       </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-muted-foreground transition-colors group-hover:text-primary">
+                      <div className="p-3 rounded-full bg-background shadow-sm mb-2 border border-border/50">
+                        <Disc className="size-6" />
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wide">
+                        Tải ảnh vuông (1:1)
+                      </span>
                     </div>
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      onChange={handleAudioChange}
-                    />
-                  </div>
-                  <ErrorMessage message={errors.audio?.message as string} />
-                  <ErrorMessage message={errors.duration?.message} />
-                </div>
+                  )}
 
-                {/* Visibility Status */}
-                <div className="p-4 rounded-xl border border-border bg-card shadow-sm flex items-center justify-between">
+                  <input
+                    type="file"
+                    accept="image/jpeg, image/png, image/webp"
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f)
+                        setValue("coverImage", f, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                    }}
+                  />
+
+                  {errors.coverImage && (
+                    <div className="absolute bottom-2 right-2 bg-destructive/90 backdrop-blur px-2 py-1 rounded text-[10px] text-destructive-foreground font-bold flex items-center gap-1 z-20">
+                      <AlertCircle className="size-3" /> Lỗi ảnh
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Audio File */}
+              <div className="bg-background p-6 rounded-xl border border-border shadow-sm">
+                <FormLabel required icon={FileAudio}>
+                  Tệp Âm Thanh
+                </FormLabel>
+                <div
+                  className={cn(
+                    "relative mt-2 p-3.5 rounded-xl border-2 border-dashed transition-all cursor-pointer shadow-sm group",
+                    errors.audio
+                      ? "border-destructive/50 bg-destructive/5"
+                      : duration > 0
+                        ? "border-primary/50 bg-primary/5"
+                        : "border-muted-foreground/20 bg-secondary/10 hover:border-primary/50 hover:bg-primary/5",
+                  )}
+                >
                   <div className="flex items-center gap-3">
                     <div
                       className={cn(
-                        "p-2.5 rounded-lg border",
-                        isPublic
-                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                          : "bg-secondary border-transparent text-muted-foreground"
+                        "size-10 rounded-lg flex items-center justify-center shrink-0 border transition-colors",
+                        duration > 0
+                          ? "bg-primary/20 text-primary border-primary/20"
+                          : "bg-background text-muted-foreground border-border/50 group-hover:text-primary",
                       )}
                     >
-                      <Globe className="size-5" />
+                      {duration > 0 ? (
+                        <AudioLines className="size-5 animate-pulse" />
+                      ) : (
+                        <FileAudio className="size-5" />
+                      )}
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-foreground">
-                        Visibility
-                      </p>
+                    <div className="flex-1 min-w-0">
                       <p
                         className={cn(
-                          "text-[11px] font-medium mt-0.5",
-                          isPublic
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-muted-foreground"
+                          "text-[13px] font-bold truncate leading-tight transition-colors",
+                          errors.audio
+                            ? "text-destructive"
+                            : duration > 0
+                              ? "text-primary"
+                              : "text-foreground group-hover:text-primary",
                         )}
                       >
-                        {isPublic ? "Published Globally" : "Hidden (Draft)"}
+                        {audioPreview || "Chọn file nhạc..."}
+                      </p>
+                      <div className="mt-1 flex">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "h-5 text-[9px] px-2 font-mono uppercase tracking-wider bg-background border",
+                            duration > 0
+                              ? "border-primary/30 text-primary"
+                              : "border-border/60 text-muted-foreground",
+                          )}
+                        >
+                          {duration > 0
+                            ? formatDuration(duration)
+                            : "MP3, WAV, FLAC"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    onChange={handleAudioChange}
+                  />
+                </div>
+                <ErrorMessage message={errors.audio?.message as string} />
+                <ErrorMessage message={errors.duration?.message} />
+              </div>
+
+              {/* Status Toggles (Public & Explicit) */}
+              <div className="space-y-3">
+                {/* Public Toggle */}
+                <div
+                  className={cn(
+                    "flex items-center justify-between p-4 border rounded-xl transition-all cursor-pointer select-none group",
+                    isPublic
+                      ? "border-emerald-500/50 bg-emerald-500/5 shadow-sm"
+                      : "border-border bg-background hover:border-emerald-500/30",
+                  )}
+                  onClick={() =>
+                    setValue("isPublic", !isPublic, { shouldDirty: true })
+                  }
+                >
+                  <div className="flex gap-3 items-center">
+                    <div
+                      className={cn(
+                        "p-2 rounded-lg transition-colors",
+                        isPublic
+                          ? "bg-emerald-500/20 text-emerald-600"
+                          : "bg-muted text-muted-foreground group-hover:text-foreground",
+                      )}
+                    >
+                      <Globe className="size-4.5" />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-bold text-foreground cursor-pointer block leading-none">
+                        Trạng thái hiển thị
+                      </Label>
+                      <p
+                        className={cn(
+                          "text-[11px] font-medium mt-1 transition-colors",
+                          isPublic
+                            ? "text-emerald-600"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {isPublic
+                          ? "Phát hành công khai"
+                          : "Bản nháp (Đang ẩn)"}
                       </p>
                     </div>
                   </div>
-                  <Switch
-                    checked={isPublic}
-                    onCheckedChange={(v) =>
-                      setValue("isPublic", v, { shouldDirty: true })
-                    }
-                    className="data-[state=checked]:bg-emerald-500"
-                  />
-                </div>
-              </aside>
-
-              {/* === MAIN CONTENT (Tabs) === */}
-              <main className="lg:col-span-8 bg-card rounded-xl border border-border shadow-sm h-fit">
-                <Tabs defaultValue="general" className="w-full">
-                  <div className="p-4 border-b border-border">
-                    <TabsList className="bg-secondary/50 p-1 rounded-lg w-full sm:w-auto inline-flex h-10 border border-border/50">
-                      <TabsTrigger
-                        value="general"
-                        className="flex-1 sm:flex-none gap-2 text-xs font-bold uppercase px-6 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm h-8 rounded-md transition-all"
-                      >
-                        Basic Info
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="advanced"
-                        className="flex-1 sm:flex-none gap-2 text-xs font-bold uppercase px-6 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm h-8 rounded-md transition-all"
-                      >
-                        Details
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="lyrics"
-                        className="flex-1 sm:flex-none gap-2 text-xs font-bold uppercase px-6 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm h-8 rounded-md transition-all"
-                      >
-                        Lyrics
-                      </TabsTrigger>
-                    </TabsList>
+                  <div
+                    className="pl-2 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Switch
+                      checked={isPublic}
+                      onCheckedChange={(v) =>
+                        setValue("isPublic", v, { shouldDirty: true })
+                      }
+                      className="data-[state=checked]:bg-emerald-500 scale-105"
+                    />
                   </div>
+                </div>
 
-                  <div className="p-6">
-                    {/* --- Tab: General --- */}
-                    <TabsContent
-                      value="general"
-                      className="space-y-6 focus-visible:ring-0 animate-in fade-in slide-in-from-bottom-1 duration-300 m-0"
+                {/* Explicit Toggle */}
+                <div
+                  className={cn(
+                    "flex items-center justify-between p-4 border rounded-xl transition-all cursor-pointer select-none group",
+                    isExplicit
+                      ? "border-amber-500/50 bg-amber-500/5 shadow-sm"
+                      : "border-border bg-background hover:border-amber-500/30",
+                  )}
+                  onClick={() =>
+                    setValue("isExplicit", !isExplicit, { shouldDirty: true })
+                  }
+                >
+                  <div className="flex gap-3 items-center">
+                    <div
+                      className={cn(
+                        "p-2 rounded-lg transition-colors",
+                        isExplicit
+                          ? "bg-amber-500/20 text-amber-600"
+                          : "bg-muted text-muted-foreground group-hover:text-foreground",
+                      )}
                     >
-                      <div>
-                        <FormLabel required>Track Title</FormLabel>
+                      <ShieldAlert className="size-4.5" />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-bold text-foreground cursor-pointer block leading-none">
+                        Nội dung 18+ (Explicit)
+                      </Label>
+                      <p
+                        className={cn(
+                          "text-[11px] font-medium mt-1 transition-colors",
+                          isExplicit
+                            ? "text-amber-600"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        Ngôn từ nhạy cảm
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className="pl-2 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Switch
+                      checked={isExplicit}
+                      onCheckedChange={(v) =>
+                        setValue("isExplicit", v, { shouldDirty: true })
+                      }
+                      className="data-[state=checked]:bg-amber-500 scale-105"
+                    />
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            {/* === MAIN CONTENT (Tabs) === */}
+            <main className="flex-1 bg-background rounded-xl border border-border shadow-sm h-fit flex flex-col overflow-hidden">
+              <Tabs defaultValue="general" className="w-full flex flex-col">
+                <div className="px-5 py-4 border-b border-border bg-background sticky top-0 z-30">
+                  <TabsList className="w-full h-11 bg-muted p-1 rounded-lg flex justify-start sm:justify-center overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <TabsTrigger
+                      value="general"
+                      className="flex-1 shrink-0 gap-2 text-[12px] font-bold uppercase tracking-wide px-4 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm h-full rounded-md transition-all"
+                    >
+                      Thông tin chính
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="advanced"
+                      className="flex-1 shrink-0 gap-2 text-[12px] font-bold uppercase tracking-wide px-4 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm h-full rounded-md transition-all"
+                    >
+                      Chi tiết
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="lyrics"
+                      className="flex-1 shrink-0 gap-2 text-[12px] font-bold uppercase tracking-wide px-4 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm h-full rounded-md transition-all"
+                    >
+                      Lời bài hát
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <div className="p-6 sm:p-8">
+                  {/* --- Tab: General --- */}
+                  <TabsContent
+                    value="general"
+                    className="space-y-6 focus-visible:ring-0 animate-in fade-in slide-in-from-bottom-2 duration-300 m-0"
+                  >
+                    <div className="space-y-1.5">
+                      <FormLabel required icon={Type}>
+                        Tên Bài Hát
+                      </FormLabel>
+                      <div className="relative">
                         <Input
                           {...register("title")}
                           className={cn(
-                            "h-11 text-base font-semibold bg-background border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 rounded-lg px-3 placeholder:text-muted-foreground/60 transition-all",
+                            inputClass,
+                            "text-base",
                             errors.title &&
-                              "border-destructive focus-visible:ring-destructive/20 bg-destructive/5"
+                              "border-destructive focus-visible:ring-destructive pr-10",
                           )}
-                          placeholder="Ex: Blinding Lights"
+                          placeholder="VD: Cơn mưa ngang qua..."
                         />
-                        <ErrorMessage message={errors.title?.message} />
+                        {errors.title && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-destructive">
+                            <AlertCircle className="size-4.5" />
+                          </div>
+                        )}
                       </div>
+                      <ErrorMessage message={errors.title?.message} />
+                    </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
                         <Controller
                           control={control}
                           name="artistId"
                           render={({ field, fieldState }) => (
                             <div>
                               <ArtistSelector
-                                label="Primary Artist"
+                                label="Nghệ sĩ chính"
                                 singleSelect
                                 value={mainArtistValue}
                                 required
                                 onChange={(ids) => field.onChange(ids[0] || "")}
+                                className="bg-transparent border-input rounded-md"
                               />
                               <ErrorMessage
                                 message={fieldState.error?.message}
@@ -371,30 +482,40 @@ const TrackModal: React.FC<TrackModalProps> = ({
                             </div>
                           )}
                         />
+                      </div>
+
+                      <div className="space-y-1.5">
                         <Controller
                           control={control}
                           name="albumId"
                           render={({ field }) => (
-                            <AlbumSelector
-                              label="Album Association"
-                              value={field.value || ""}
-                              onChange={field.onChange}
-                            />
+                            <div>
+                              <AlbumSelector
+                                label="Nằm trong Album"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                              />
+                            </div>
                           )}
                         />
                       </div>
+                    </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
                         <Controller
                           control={control}
                           name="genreIds"
                           render={({ field, fieldState }) => (
                             <div>
                               <GenreSelector
-                                label="Main Genre"
+                                label="Thể loại nhạc"
+                                singleSelect={false}
+                                variant="form"
                                 value={field.value}
                                 onChange={field.onChange}
                                 required
+                                className="bg-transparent border-input rounded-md"
                               />
                               <ErrorMessage
                                 message={fieldState.error?.message}
@@ -402,194 +523,197 @@ const TrackModal: React.FC<TrackModalProps> = ({
                             </div>
                           )}
                         />
-                        <div>
-                          <FormLabel>Release Date</FormLabel>
-                          <Input
-                            type="date"
-                            {...register("releaseDate")}
-                            className="h-10 rounded-lg bg-background border-input shadow-sm px-3 text-sm font-medium"
-                          />
-                        </div>
                       </div>
+                      <div className="space-y-1.5">
+                        <FormLabel icon={Calendar}>Ngày Phát Hành</FormLabel>
+                        <Input
+                          type="date"
+                          {...register("releaseDate")}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
 
+                    <div className="space-y-1.5">
                       <Controller
                         control={control}
                         name="featuringArtistIds"
                         render={({ field }) => (
                           <ArtistSelector
-                            label="Guest Features (Optional)"
+                            label="Nghệ sĩ hợp tác (Feat)"
                             singleSelect={false}
                             value={field.value || []}
                             onChange={field.onChange}
                             disabledIds={mainArtistValue}
+                            className="bg-transparent border-input rounded-md"
                           />
                         )}
                       />
+                    </div>
+                  </TabsContent>
 
-                      <div className="pt-4 border-t border-border">
-                        <div className="flex items-center justify-between p-3 border border-border rounded-xl bg-secondary/10">
-                          <div className="flex items-center gap-3">
-                            <ShieldAlert
-                              className={cn(
-                                "size-5",
-                                isExplicit
-                                  ? "text-amber-500 fill-amber-500/20"
-                                  : "text-muted-foreground"
-                              )}
-                            />
-                            <div>
-                              <p className="text-sm font-bold leading-none text-foreground">
-                                Explicit Content
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                Contains lyrics or themes for mature audiences
-                              </p>
-                            </div>
-                          </div>
-                          <Switch
-                            checked={isExplicit}
-                            onCheckedChange={(v) =>
-                              setValue("isExplicit", v, { shouldDirty: true })
-                            }
-                            className="data-[state=checked]:bg-amber-500"
-                          />
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    {/* --- Tab: Advanced --- */}
-                    <TabsContent
-                      value="advanced"
-                      className="space-y-6 focus-visible:ring-0 animate-in fade-in slide-in-from-bottom-1 duration-300 m-0"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div>
-                          <FormLabel>ISRC Code</FormLabel>
-                          <Input
-                            {...register("isrc")}
-                            className={cn(
-                              "h-10 font-mono text-sm rounded-lg bg-background border-input shadow-sm px-3 uppercase placeholder:normal-case",
-                              errors.isrc &&
-                                "border-destructive bg-destructive/5"
-                            )}
-                            placeholder="VN-XXX-24-00001"
-                          />
-                          <ErrorMessage message={errors.isrc?.message} />
-                        </div>
-
-                        <div>
-                          <FormLabel>Copyright Notice</FormLabel>
-                          <Input
-                            {...register("copyright")}
-                            className="h-10 text-sm rounded-lg bg-background border-input shadow-sm px-3"
-                            placeholder="℗ 2024 Record Label"
-                          />
-                          <ErrorMessage message={errors.copyright?.message} />
-                        </div>
+                  {/* --- Tab: Advanced --- */}
+                  <TabsContent
+                    value="advanced"
+                    className="space-y-6 focus-visible:ring-0 animate-in fade-in slide-in-from-bottom-2 duration-300 m-0"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
+                        <FormLabel icon={ScanBarcode}>Mã ISRC</FormLabel>
+                        <Input
+                          {...register("isrc")}
+                          className={cn(
+                            inputClass,
+                            "font-mono uppercase placeholder:normal-case placeholder:font-sans",
+                            errors.isrc &&
+                              "border-destructive focus-visible:ring-destructive",
+                          )}
+                          placeholder="VD: VN-XXX-24-00001"
+                        />
+                        <ErrorMessage message={errors.isrc?.message} />
                       </div>
 
-                      <div>
-                        <FormLabel>Search Tags</FormLabel>
-                        <Controller
-                          name="tags"
-                          control={control}
-                          render={({ field }) => (
-                            <TagInput
-                              value={field.value || []}
-                              onChange={field.onChange}
-                              className="bg-background border-input shadow-sm min-h-10 rounded-lg"
-                              placeholder="Add tags (Enter to add)..."
-                            />
+                      <div className="space-y-1.5">
+                        <FormLabel icon={Copyright}>
+                          Bản Quyền (Copyright)
+                        </FormLabel>
+                        <Input
+                          {...register("copyright")}
+                          className={inputClass}
+                          placeholder="℗ 2024 Record Label Name"
+                        />
+                        <ErrorMessage message={errors.copyright?.message} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <FormLabel icon={Tags}>Từ Khóa (Tags)</FormLabel>
+                      <Controller
+                        name="tags"
+                        control={control}
+                        render={({ field }) => (
+                          <TagInput
+                            value={field.value || []}
+                            onChange={field.onChange}
+                            className="bg-transparent border-input min-h-[44px] rounded-md focus-within:ring-1 focus-within:ring-primary"
+                            placeholder="Nhập tag và nhấn Enter..."
+                          />
+                        )}
+                      />
+                      <ErrorMessage message={errors.tags?.message} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
+                        <FormLabel icon={ListOrdered}>Thứ Tự Track</FormLabel>
+                        <Input
+                          type="number"
+                          {...register("trackNumber", {
+                            valueAsNumber: true,
+                          })}
+                          className={cn(
+                            inputClass,
+                            "font-mono font-bold",
+                            errors.trackNumber && "border-destructive",
                           )}
                         />
-                        <ErrorMessage message={errors.tags?.message} />
+                        <ErrorMessage message={errors.trackNumber?.message} />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <FormLabel>Track No.</FormLabel>
-                          <Input
-                            type="number"
-                            {...register("trackNumber", {
-                              valueAsNumber: true,
-                            })}
-                            className={cn(
-                              "h-10 rounded-lg bg-background border-input shadow-sm px-3",
-                              errors.trackNumber &&
-                                "border-destructive bg-destructive/5"
-                            )}
-                          />
-                          <ErrorMessage message={errors.trackNumber?.message} />
-                        </div>
-
-                        <div>
-                          <FormLabel>Disk No.</FormLabel>
-                          <Input
-                            type="number"
-                            {...register("diskNumber", { valueAsNumber: true })}
-                            className={cn(
-                              "h-10 rounded-lg bg-background border-input shadow-sm px-3",
-                              errors.diskNumber &&
-                                "border-destructive bg-destructive/5"
-                            )}
-                          />
-                          <ErrorMessage message={errors.diskNumber?.message} />
-                        </div>
+                      <div className="space-y-1.5">
+                        <FormLabel icon={Disc}>Thứ Tự Đĩa (Disk)</FormLabel>
+                        <Input
+                          type="number"
+                          {...register("diskNumber", { valueAsNumber: true })}
+                          className={cn(
+                            inputClass,
+                            "font-mono font-bold",
+                            errors.diskNumber && "border-destructive",
+                          )}
+                        />
+                        <ErrorMessage message={errors.diskNumber?.message} />
                       </div>
-                    </TabsContent>
+                    </div>
+                  </TabsContent>
 
-                    {/* --- Tab: Lyrics --- */}
-                    <TabsContent
-                      value="lyrics"
-                      className="space-y-3 focus-visible:ring-0 m-0 animate-in fade-in slide-in-from-bottom-1 duration-300"
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <FormLabel>Lyrics Canvas</FormLabel>
-                        <Badge
-                          variant="secondary"
-                          className="text-[10px] uppercase font-bold px-2 py-0.5 border border-border"
-                        >
-                          Synced Supported
-                        </Badge>
+                  {/* --- Tab: Lyrics --- */}
+                  <TabsContent
+                    value="lyrics"
+                    className="space-y-4 focus-visible:ring-0 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-2 mb-2">
+                      <div className="space-y-1">
+                        <Label className="text-[13px] font-bold text-foreground flex items-center gap-2">
+                          <AlignLeft className="size-4" /> Khung Nhập Lời Bài
+                          Hát
+                        </Label>
+                        <p className="text-[11px] font-medium text-muted-foreground">
+                          Hỗ trợ định dạng LRC để hiển thị karaoke đồng bộ
+                        </p>
                       </div>
-                      <Textarea
-                        {...register("lyrics")}
-                        className="min-h-[320px] font-mono text-sm p-4 bg-background border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 rounded-xl leading-relaxed resize-none transition-all custom-scrollbar"
-                        placeholder="[00:10.00] Enter lyrics line by line..."
-                      />
-                    </TabsContent>
-                  </div>
-                </Tabs>
-              </main>
-            </div>
+                      <Badge
+                        variant="secondary"
+                        className="w-fit text-[9px] uppercase font-bold px-2 py-1 border-primary/20 bg-primary/10 text-primary"
+                      >
+                        LRC Sync Supported
+                      </Badge>
+                    </div>
+                    <Textarea
+                      {...register("lyrics")}
+                      className={cn(
+                        "min-h-[250px] sm:min-h-[350px] font-mono text-[13px] p-4 bg-transparent border-input focus-visible:ring-1 focus-visible:ring-primary rounded-md leading-relaxed resize-none transition-all custom-scrollbar",
+                        errors.lyrics &&
+                          "border-destructive focus-visible:ring-destructive",
+                      )}
+                      placeholder="[00:10.00] Nhập lời bài hát dòng theo dòng..."
+                    />
+                    <ErrorMessage message={errors.lyrics?.message} />
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </main>
           </form>
         </div>
 
         {/* --- FOOTER --- */}
-        <footer className="px-6 py-4 border-t border-border bg-background flex justify-end items-center gap-3 shrink-0 z-20">
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={onClose}
-            disabled={isPending}
-            className="h-10 px-6 rounded-lg font-bold text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
-          >
-            Cancel
-          </Button>
-          <Button
-            form="track-form"
-            type="submit"
-            disabled={isPending}
-            loading={isPending}
-            className="h-10 px-8 rounded-lg font-bold text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {!isPending && <Save className="size-4 mr-2" />}
-            {trackToEdit ? "Save Changes" : "Publish Track"}
-          </Button>
-        </footer>
+        <div className="flex items-center justify-between p-5 border-t border-border bg-background shrink-0 z-20">
+          <p className="text-[11px] text-muted-foreground font-medium hidden sm:block">
+            Các trường có{" "}
+            <span className="text-destructive font-bold text-sm">*</span> là bắt
+            buộc.
+          </p>
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="font-bold border-input bg-background hover:bg-accent hover:text-foreground h-10 px-5 rounded-md flex-1 sm:flex-none"
+            >
+              Hủy
+            </Button>
+            <Button
+              form="track-form"
+              type="submit"
+              disabled={isLoading}
+              className="font-bold shadow-md hover:shadow-lg transition-all h-10 px-6 rounded-md flex-1 sm:flex-none"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" /> Đang lưu...
+                </>
+              ) : (
+                <>
+                  <Save className="size-4 mr-2" />
+                  {isEditing ? "Lưu thay đổi" : "Tải lên ngay"}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 

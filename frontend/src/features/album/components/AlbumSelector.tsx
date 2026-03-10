@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { Search, Disc, Check, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAlbumAdmin } from "@/features/album/hooks/useAlbumAdmin";
 import type { Album } from "@/features/album/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useAlbumsQuery } from "@/features/album/hooks/useAlbumsQuery";
 
 interface AlbumSelectorProps {
   value: string;
@@ -22,18 +22,20 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
   required,
 }) => {
   const [filter, setFilter] = useState("");
-  const { albums, isLoading } = useAlbumAdmin(100);
+  const { data, isLoading } = useAlbumsQuery({ limit: 100 });
 
   const filteredAlbums = useMemo(() => {
-    if (!filter) return albums;
-    return albums.filter((album: Album) =>
-      album.title.toLowerCase().includes(filter.toLowerCase())
+    if (!filter) return data?.albums || [];
+    return (
+      data?.albums.filter((album: Album) =>
+        album.title.toLowerCase().includes(filter.toLowerCase()),
+      ) || []
     );
-  }, [albums, filter]);
+  }, [data, filter]);
 
   const selectedAlbum = useMemo(() => {
-    return albums.find((a: Album) => a._id === value);
-  }, [albums, value]);
+    return data?.albums.find((a: Album) => a._id === value);
+  }, [data, value]);
 
   const handleToggle = (id: string) => {
     onChange(value === id ? "" : id);
@@ -48,7 +50,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
             className={cn(
               // Thay đổi: Tăng độ đậm (foreground/80) thay vì muted
               "text-xs font-bold uppercase flex gap-1.5 items-center tracking-wider text-foreground/80",
-              error && "text-destructive"
+              error && "text-destructive",
             )}
           >
             <Disc className="size-4" /> {label}{" "}
@@ -81,7 +83,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
         className={cn(
           "p-3 border border-input rounded-xl bg-background shadow-sm space-y-3 transition-all",
           error &&
-            "border-destructive ring-1 ring-destructive/20 bg-destructive/5"
+            "border-destructive ring-1 ring-destructive/20 bg-destructive/5",
         )}
       >
         {/* Search Input */}
@@ -129,14 +131,14 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                       isSelected
                         ? // Thay đổi: Màu nền Primary nhạt + Viền Primary rõ ràng
                           "bg-primary/10 border-primary/20 text-foreground shadow-sm"
-                        : "bg-transparent border-transparent hover:bg-secondary hover:text-secondary-foreground"
+                        : "bg-transparent border-transparent hover:bg-secondary hover:text-secondary-foreground",
                     )}
                   >
                     {/* Cover Image */}
                     <div
                       className={cn(
                         "size-10 rounded-md overflow-hidden shrink-0 border",
-                        isSelected ? "border-primary/30" : "border-border"
+                        isSelected ? "border-primary/30" : "border-border",
                       )}
                     >
                       <img
@@ -151,7 +153,7 @@ export const AlbumSelector: React.FC<AlbumSelectorProps> = ({
                       <p
                         className={cn(
                           "text-xs font-bold truncate leading-tight",
-                          isSelected ? "text-primary" : "text-foreground"
+                          isSelected ? "text-primary" : "text-foreground",
                         )}
                       >
                         {album.title}

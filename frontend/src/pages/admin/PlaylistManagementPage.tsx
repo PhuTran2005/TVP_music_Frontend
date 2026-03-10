@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { APP_CONFIG } from "@/config/constants";
 
@@ -15,38 +15,34 @@ import PlaylistFilter from "@/features/playlist/components/PlaylistFilter";
 import PlaylistCard from "@/features/playlist/components/PlaylistCard";
 import PlaylistModal from "@/features/playlist/components/PlaylistModal";
 
-// Hooks & Types
-import { usePlaylistAdmin } from "@/features/playlist/hooks/usePlaylistAdmin";
-import { useDebounce } from "@/hooks/useDebounce";
+// 🔥 Hooks mới (đã tách)
+import { usePlaylistParams } from "@/features/playlist/hooks/usePlaylistParams";
+import { usePlaylistsQuery } from "@/features/playlist/hooks/usePlaylistsQuery";
+import { usePlaylistMutations } from "@/features/playlist/hooks/usePlaylistMutations";
 import { type Playlist } from "@/features/playlist/types";
 
 const PlaylistManagementPage = () => {
-  // --- HOOKS ---
+  // --- 1. STATE MANAGEMENT (URL Source of Truth) ---
   const {
-    playlists,
-    meta,
-    isLoading, // Loading fetch
-    isMutating, // Loading create/update/delete (Dùng cái này cho button save)
     filterParams,
-    setFilterParams,
-    createPlaylist,
-    updateMetadata,
-    deletePlaylist,
+    handleSearch,
+    handleFilterChange, // Thay thế setFilterParams bằng handler chuẩn
     handlePageChange,
-  } = usePlaylistAdmin(APP_CONFIG.PAGINATION_LIMIT || 12);
+    clearFilters: handleReset, // Đổi tên cho đồng bộ UI
+  } = usePlaylistParams(APP_CONFIG.PAGINATION_LIMIT || 12);
 
-  // --- SEARCH ---
-  const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearch = useDebounce(searchTerm, 500);
+  // --- 2. DATA FETCHING (Read) ---
+  const { data, isLoading } = usePlaylistsQuery(filterParams);
 
-  useEffect(() => {
-    setFilterParams((prev) => {
-      if (prev.keyword === debouncedSearch) return prev;
-      return { ...prev, keyword: debouncedSearch, page: 1 };
-    });
-  }, [debouncedSearch, setFilterParams]);
+  // --- 3. MUTATIONS (Write) ---
+  const {
+    createPlaylistAsync,
+    updatePlaylistAsync,
+    deletePlaylist,
+    isMutating, // Loading cho Save/Delete
+  } = usePlaylistMutations();
 
-  // --- MODAL STATE ---
+  // --- 4. LOCAL UI STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [playlistToEdit, setPlaylistToEdit] = useState<Playlist | null>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(
@@ -64,46 +60,45 @@ const PlaylistManagementPage = () => {
     setIsModalOpen(true);
   };
 
-  // 🔥 DELETE HANDLER (Đã chuẩn)
   const handleConfirmDelete = () => {
     if (playlistToDelete) {
-      // Gọi trực tiếp: id, options
       deletePlaylist(playlistToDelete._id, {
         onSuccess: () => setPlaylistToDelete(null),
       });
     }
   };
 
-  // 🔥 SUBMIT HANDLER (Đã sửa lại cho khớp với Hook mới)
-  const handleSubmitForm = (formData: any) => {
-    if (playlistToEdit) {
-      // ✅ FIX: Truyền 3 tham số rời rạc: ID, Data, Options
-      updateMetadata(
-        playlistToEdit._id, // Arg 1: ID
-        formData, // Arg 2: Data
-        {
-          // Arg 3: Options
-          onSuccess: () => setIsModalOpen(false),
-        },
-      );
-    } else {
-      // ✅ Create vẫn giữ nguyên: Data, Options
-      createPlaylist(formData, {
-        onSuccess: () => setIsModalOpen(false),
-      });
+  // 🔥 CORE LOGIC: Handle Form Submit (FormData)
+  // Logic giống hệt AlbumManagementPage: Đơn giản, dễ hiểu
+  const handleSubmitForm = async (formData: FormData) => {
+    try {
+      if (playlistToEdit) {
+        await updatePlaylistAsync(playlistToEdit._id, formData);
+      } else {
+        await createPlaylistAsync(formData);
+      }
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Failed to save playlist", error);
+      // Giữ modal mở để user sửa lỗi
     }
   };
 
-  const totalPages = meta.totalPages || 1;
-  const totalItems = meta.totalItems || 0;
-  const pageSize = meta.pageSize || APP_CONFIG.PAGINATION_LIMIT;
+  // Safe Access Data
+  const playlists = data?.playlists || [];
+  const meta = data?.meta || {
+    totalPages: 1,
+    totalItems: 0,
+    page: 1,
+    pageSize: 12,
+  };
 
   return (
     <div className="space-y-8 pb-12">
       {/* --- HEADER --- */}
       <PageHeader
         title="Playlists Management"
-        subtitle={`Managing ${totalItems} playlists in the system.`}
+        subtitle={`Managing ${meta.totalItems} playlists in the system.`}
         action={
           <Button
             onClick={handleOpenCreate}
@@ -115,12 +110,24 @@ const PlaylistManagementPage = () => {
       />
 
       {/* --- FILTER --- */}
-      <PlaylistFilter params={filterParams} setParams={setFilterParams} />
+      {/* Truyền trực tiếp các handler từ usePlaylistParams.
+          Component Filter không cần biết setParams là gì, chỉ cần biết onSearch, onFilterChange...
+      */}
+      <div className="bg-card rounded-2xl shadow-sm">
+        <PlaylistFilter
+          params={filterParams}
+          onSearch={handleSearch}
+          onFilterChange={handleFilterChange} // Sử dụng hàm generic
+          onReset={handleReset}
+        />
+      </div>
 
       {/* --- CONTENT --- */}
-      {/* Chỉ hiện Skeleton khi đang fetch dữ liệu ban đầu, tránh nháy khi mutate */}
-      {isLoading && playlists.length === 0 ? (
-        <CardSkeleton count={pageSize} />
+      {isLoading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6">
+          {/* Render 10 cái skeleton với hiệu ứng wave */}
+          <CardSkeleton count={10} />
+        </div>
       ) : playlists.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 animate-in fade-in duration-500">
           {playlists.map((playlist: Playlist) => (
@@ -133,7 +140,7 @@ const PlaylistManagementPage = () => {
           ))}
         </div>
       ) : (
-        <div className="py-16 bg-muted/5 rounded-xl border border-dashed border-border">
+        <div className="bg-muted/5 rounded-xl border border-dashed border-border">
           <MusicResult
             status="empty"
             title="No playlists found"
@@ -142,35 +149,35 @@ const PlaylistManagementPage = () => {
         </div>
       )}
 
-      {/* --- PAGINATION --- */}
-      {playlists.length > 0 && (
-        <div className="pt-6 border-t border-border">
+      {!isLoading && playlists.length > 0 && (
+        <div className="bg-card border rounded-2xl p-4 shadow-sm">
           <Pagination
             currentPage={meta.page}
-            totalPages={totalPages}
+            totalPages={meta.totalPages}
             onPageChange={handlePageChange}
-            totalItems={totalItems}
-            itemsPerPage={pageSize}
+            totalItems={meta.totalItems}
+            itemsPerPage={meta.pageSize || APP_CONFIG.PAGINATION_LIMIT}
           />
         </div>
       )}
 
-      {/* --- MODALS --- */}
-      <PlaylistModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        playlistToEdit={playlistToEdit}
-        onSubmit={handleSubmitForm}
-        // Sử dụng isMutating để chỉ loading nút Save chứ không loading cả trang
-        isPending={isMutating}
-      />
+      {/* Create/Edit Modal */}
+      {isModalOpen && (
+        <PlaylistModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          playlistToEdit={playlistToEdit}
+          onSubmit={handleSubmitForm}
+          isPending={isMutating} // Loading spinner cho nút Save
+        />
+      )}
 
+      {/* Delete Confirmation */}
       <ConfirmationModal
         isOpen={!!playlistToDelete}
         onCancel={() => setPlaylistToDelete(null)}
         onConfirm={handleConfirmDelete}
         title="Delete Playlist?"
-        // Sử dụng isMutating để disable nút xóa khi đang chạy
         isLoading={isMutating}
         description={
           <div className="space-y-4">

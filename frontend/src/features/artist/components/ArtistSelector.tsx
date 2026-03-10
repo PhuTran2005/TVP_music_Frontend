@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitialsTextAvartar } from "@/utils/genTextAvartar";
 import { Label } from "@/components/ui/label";
-import { useArtistAdmin } from "@/features/artist/hooks";
+import { useArtistsQuery } from "@/features/artist/hooks/useArtistsQuery";
 
 interface ArtistSelectorProps {
   label?: string;
@@ -30,9 +30,9 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
   className,
 }) => {
   const [filter, setFilter] = useState("");
-  const { artists: artistRes, isLoading } = useArtistAdmin(50);
+  const { data, isLoading } = useArtistsQuery({ limit: 100 });
 
-  const artists = useMemo(() => artistRes || [], [artistRes]);
+  const artists = useMemo(() => data?.artists || [], [data]);
 
   const filteredArtists = useMemo(() => {
     let result = artists;
@@ -73,9 +73,8 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
         <Input
           placeholder="Tìm nghệ sĩ..."
-          // Thay đổi: Nền đặc và viền rõ ràng (border-input)
           className={cn(
-            "pl-9 pr-8 h-10 text-sm bg-background border-input shadow-sm rounded-lg focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
+            "pl-9 pr-8 h-10 text-sm bg-background border-input shadow-sm rounded-sm focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
             error &&
               "border-destructive focus-visible:ring-destructive/20 bg-destructive/5",
           )}
@@ -86,7 +85,7 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
           <button
             type="button"
             onClick={() => setFilter("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
           >
             <X className="size-3.5" />
           </button>
@@ -95,7 +94,13 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
 
       {/* --- LIST --- */}
       {/* Thay đổi: Khung viền đậm hơn, background sạch */}
-      <div className="max-h-52 overflow-y-auto custom-scrollbar pr-1 border border-border shadow-sm rounded-xl bg-background overflow-hidden">
+      <div
+        className={cn(
+          "max-h-52 overflow-y-auto custom-scrollbar pr-1 border border-border shadow-sm rounded-sm bg-background",
+          error &&
+            "border-destructive focus-visible:ring-destructive/20 bg-destructive/5",
+        )}
+      >
         {isLoading ? (
           <div className="flex justify-center items-center py-8 text-xs text-muted-foreground gap-2">
             <Loader2 className="size-4 animate-spin text-primary" /> Đang tải
@@ -113,7 +118,7 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
                   key={artist._id}
                   onClick={() => !isDisabled && toggleArtist(artist._id)}
                   className={cn(
-                    "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all border",
+                    "flex items-center gap-3 p-2 rounded-sm cursor-pointer transition-all border",
                     isDisabled
                       ? "opacity-50 cursor-not-allowed bg-muted/30 border-transparent grayscale"
                       : isSelected
@@ -151,7 +156,9 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({
                       {artist.name}
                     </p>
                     {/* Có thể thêm sub-text nếu cần, ví dụ Role */}
-                    {/* <p className="text-[10px] text-muted-foreground truncate">Artist</p> */}
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      Artist
+                    </p>
                   </div>
 
                   {isSelected && (

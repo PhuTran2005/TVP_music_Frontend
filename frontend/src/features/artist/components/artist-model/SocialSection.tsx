@@ -93,7 +93,7 @@ const SocialSection: React.FC<SocialSectionProps> = ({ form }) => {
                   errors.socialLinks?.[
                     field.name as keyof typeof errors.socialLinks
                   ] &&
-                    "border-destructive focus-visible:ring-destructive/20 bg-destructive/5"
+                    "border-destructive focus-visible:ring-destructive/20 bg-destructive/5",
                 )}
               />
             </div>

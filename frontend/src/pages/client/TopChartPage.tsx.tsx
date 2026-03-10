@@ -1,22 +1,22 @@
 import React, { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, TrendingUp, Clock, Info, BarChart2 } from "lucide-react";
+import { Loader2, Info, BarChart2 } from "lucide-react";
 import { useRealtimeChart } from "@/features/track/hooks/useRealtimeChart";
 import { ChartItem } from "@/features/track/components/ChartItem";
 import { ChartLine } from "@/features/track/components/ChartLine"; // Đảm bảo component này nhận prop `data`
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ITrack } from "@/features/track/types";
 
 export const TopChartPage = () => {
   // 🔥 FIX 1: Lấy thêm chartData từ hook
   const { tracks, chartData, prevRankMap, isLoading, isUpdating } =
     useRealtimeChart();
-  console.log("Chart Data:", chartData, tracks);
   // Tạo hiệu ứng thời gian thực giả lập
   const lastUpdated = useMemo(
     () =>
       new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    [tracks] // Update khi list track thay đổi
+    [tracks], // Update khi list track thay đổi
   );
 
   if (isLoading) {
@@ -93,7 +93,7 @@ export const TopChartPage = () => {
                       Leaders
                     </span>
                     <div className="flex -space-x-3">
-                      {tracks.slice(0, 3).map((t, i) => (
+                      {tracks.slice(0, 3).map((t: ITrack, i: number) => (
                         <div key={t._id} className="relative group/avatar">
                           <img
                             src={t.coverImage}
@@ -102,8 +102,8 @@ export const TopChartPage = () => {
                               i === 0
                                 ? "z-30 border-blue-500"
                                 : i === 1
-                                ? "z-20 border-green-500"
-                                : "z-10 border-red-500"
+                                  ? "z-20 border-green-500"
+                                  : "z-10 border-red-500",
                             )}
                             alt={t.title}
                             title={`#${i + 1} ${t.title}`}
@@ -151,11 +151,11 @@ export const TopChartPage = () => {
         <div
           className={cn(
             "flex flex-col gap-3 transition-opacity duration-500",
-            isUpdating ? "opacity-60 pointer-events-none" : "opacity-100"
+            isUpdating ? "opacity-60 pointer-events-none" : "opacity-100",
           )}
         >
           <AnimatePresence mode="popLayout" initial={false}>
-            {tracks.map((track, index) => {
+            {tracks.map((track: ITrack, index: number) => {
               const rank = index + 1;
               const prevRank = prevRankMap[track._id] || rank;
 

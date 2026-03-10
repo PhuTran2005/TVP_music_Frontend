@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { type UseFormReturn } from "react-hook-form";
-import { Image as ImageIcon, X } from "lucide-react";
+import { X, Upload, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import type { AlbumFormValues } from "@/features/album/schemas/album.schema";
 
 interface CoverUploadProps {
@@ -10,11 +10,14 @@ interface CoverUploadProps {
 }
 
 const CoverUpload: React.FC<CoverUploadProps> = ({ form }) => {
-  const { watch, setValue } = form;
+  const {
+    watch,
+    setValue,
+    formState: { errors },
+  } = form;
   const coverValue = watch("coverImage");
   const [preview, setPreview] = useState<string | null>(null);
 
-  // Auto generate preview URL
   useEffect(() => {
     if (coverValue instanceof File) {
       const url = URL.createObjectURL(coverValue);
@@ -30,61 +33,78 @@ const CoverUpload: React.FC<CoverUploadProps> = ({ form }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // shouldDirty: true -> Để payloadBuilder biết field này đã thay đổi
       setValue("coverImage", file, { shouldValidate: true, shouldDirty: true });
     }
   };
 
   return (
-    <div className="space-y-3">
-      <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-        Album Cover
-      </Label>
-      <div className="relative group aspect-square w-full rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/50 transition-all overflow-hidden bg-muted/30 flex items-center justify-center">
+    <div className="space-y-4">
+      <div>
+        <h4 className="text-[13px] font-bold uppercase tracking-widest text-foreground">
+          Ảnh bìa (Cover)
+        </h4>
+      </div>
+
+      <div
+        className={cn(
+          "relative group aspect-square w-full rounded-lg border border-dashed transition-all overflow-hidden flex items-center justify-center cursor-pointer bg-muted/10 hover:bg-muted/30 hover:border-primary/50",
+          errors.coverImage
+            ? "border-destructive bg-destructive/5"
+            : "border-border",
+        )}
+      >
         {preview ? (
           <img
             src={preview}
-            alt="Cover Preview"
-            className="w-full h-full object-cover transition-opacity group-hover:opacity-75"
+            alt="Cover"
+            className="w-full h-full object-cover relative z-10"
           />
         ) : (
-          <div className="text-center p-4 flex flex-col items-center">
-            <div className="p-3 bg-background rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
-              <ImageIcon className="size-6 text-muted-foreground" />
+          <div className="text-center p-6 flex flex-col items-center">
+            <div className="size-12 bg-background rounded-md shadow-sm border border-border flex items-center justify-center mb-3">
+              <Upload className="size-5 text-muted-foreground" />
             </div>
-            <span className="text-xs font-medium text-muted-foreground">
-              Click to upload
+            <span className="text-[13px] font-semibold text-foreground">
+              Tải ảnh lên
+            </span>
+            <span className="text-[11px] font-medium text-muted-foreground mt-1 text-center">
+              JPEG, PNG • Max 5MB
             </span>
           </div>
         )}
 
-        {/* Input ẩn phủ lên trên */}
         <input
           type="file"
-          accept="image/*"
-          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+          accept="image/jpeg, image/png, image/webp"
+          className="absolute inset-0 opacity-0 cursor-pointer z-20"
           onChange={handleFileChange}
         />
 
-        {/* Nút xóa ảnh */}
         {preview && (
           <Button
             type="button"
             variant="destructive"
             size="icon"
-            className="absolute top-2 right-2 z-20 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+            className="absolute top-2 right-2 z-30 h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
             onClick={(e) => {
               e.stopPropagation();
-              setValue("coverImage", null, { shouldDirty: true });
+              setValue("coverImage", null, {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
             }}
           >
             <X className="size-3.5" />
           </Button>
         )}
       </div>
-      <p className="text-[10px] text-muted-foreground text-center">
-        Recommended: 1000x1000px. Max 5MB.
-      </p>
+
+      {errors.coverImage && (
+        <p className="text-[12px] text-destructive font-medium flex items-center gap-1.5 mt-1">
+          <AlertCircle className="size-3.5" />{" "}
+          {errors.coverImage.message as string}
+        </p>
+      )}
     </div>
   );
 };

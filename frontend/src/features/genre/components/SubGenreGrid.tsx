@@ -12,7 +12,7 @@ export const SubGenreGrid = ({ genres }: { genres: Genre[] }) => {
         {genres.map((g) => (
           <Link
             key={g._id}
-            to={`/genre/${g._id}`}
+            to={`/genres/${g.slug}`}
             className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer"
           >
             <ImageWithFallback

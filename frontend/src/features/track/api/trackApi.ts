@@ -1,78 +1,123 @@
 import api from "@/lib/axios";
-import { buildFormData } from "@/utils/form-data"; // Import hàm helper
+import type { ApiResponse, PagedResponse } from "@/types";
 import type {
   ChartResponse,
-  Track,
+  ITrack,
   TrackFilterParams,
 } from "@/features/track/types";
-import type {
-  BulkTrackFormValues,
-  TrackFormValues,
-} from "@/features/track/schemas/track.schema";
-import type { ApiResponse, PagedResponse } from "@/types";
+import { BulkTrackFormValues } from "@/features/track/schemas/track.schema";
 
+/**
+ * QUY TẮC ĐỒNG NHẤT:
+ * Tất cả các hàm đều bóc tách (destructure) `{ data }` từ AxiosResponse
+ * và trả về đúng định dạng của Backend (ApiResponse).
+ */
 const trackApi = {
-  // 1. Get List
+  // ==========================================
+  // 1. QUERIES (Lấy dữ liệu)
+  // ==========================================
+
+  // Lấy danh sách (Dùng cho cả Admin & Public tùy vào params truyền vào)
   getAll: async (params: TrackFilterParams) => {
-    // Thêm await để lấy data clean luôn, thay vì trả về nguyên cục response axios
-    const response = await api.get<ApiResponse<PagedResponse<Track>>>(
+    const { data } = await api.get<ApiResponse<PagedResponse<ITrack>>>(
       "/tracks",
-      { params }
+      {
+        params,
+      },
     );
-    return response.data;
-  },
-
-  // 2. Create
-  create: async (data: TrackFormValues) => {
-    // 🔥 Magic ở đây: buildFormData tự xử lý Audio, Image, GenreIds (JSON), Boolean...
-    const formData = buildFormData(data);
-    return api.post("/tracks/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
-
-  // 3. Update
-  update: async (id: string, data: Partial<TrackFormValues>) => {
-    // Tương tự, buildFormData tự lọc các field undefined/null
-    const formData = buildFormData(data);
-
-    return api.patch(`/tracks/${id}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
-  changeStatus: async (id: string, status: string): Promise<Track> => {
-    // Không cần FormData, chỉ cần gửi JSON object
-    const { data } = await api.patch(`/tracks/change-status/${id}`, { status });
-    return data.data; // Tùy vào response backend trả về { data: ... } hay trực tiếp
-  },
-
-  /**
-   * API: Thử lại Transcode
-   * Method: POST
-   * Body: Empty {} (Vì axios post bắt buộc tham số thứ 2 là body)
-   */
-  retryTranscode: async (id: string): Promise<ApiResponse<Track>> => {
-    // Tham số thứ 2 là body (để rỗng), tham số thứ 3 mới là config (headers)
-    const { data } = await api.post(`/tracks/${id}/retry`, {});
     return data;
   },
+
+  // Admin: Lấy chi tiết bài hát bằng ID
+  getById: async (id: string) => {
+    const { data } = await api.get<ApiResponse<ITrack>>(`/tracks/${id}`);
+    return data;
+  },
+
+  // Public: Lấy chi tiết bài hát bằng Slug (Dùng cho SEO/Client)
+  getDetail: async (slug: string) => {
+    // Tùy endpoint backend của bạn, có thể là /tracks/slug/:slug hoặc /tracks/:slug
+    const { data } = await api.get<ApiResponse<ITrack>>(
+      `/tracks/detail/${slug}`,
+    );
+    return data;
+  },
+
+  // ==========================================
+  // 2. MUTATIONS (Thêm / Sửa / Xóa cơ bản)
+  // ==========================================
+
+  // Upload bài hát (Dùng FormData vì chứa file âm thanh/hình ảnh)
+  upload: async (formData: FormData) => {
+    const { data } = await api.post<ApiResponse<ITrack>>("/tracks", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+
+  // Cập nhật thông tin (Dùng FormData nếu có đổi ảnh bìa)
+  update: async (id: string, formData: FormData) => {
+    const isFormData = formData instanceof FormData;
+    const { data } = await api.patch<ApiResponse<ITrack>>(
+      `/tracks/${id}`,
+      formData,
+      {
+        headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
+      },
+    );
+    return data;
+  },
+
+  // Xóa bài hát
+  delete: async (id: string) => {
+    const { data } = await api.delete<ApiResponse<null>>(`/tracks/${id}`);
+    return data;
+  },
+
+  // ==========================================
+  // 3. ACTIONS (Các thao tác đặc thù)
+  // ==========================================
+
+  // Đổi trạng thái hiển thị (Active/Inactive)
+  changeStatus: async (id: string, status: string) => {
+    const { data } = await api.patch<ApiResponse<ITrack>>(
+      `/tracks/change-status/${id}`,
+      {
+        status,
+      },
+    );
+    return data;
+  },
+
+  // Thử lại tiến trình chuyển đổi file audio (Transcode) nếu bị lỗi
+  retryTranscode: async (id: string) => {
+    // Axios POST bắt buộc có tham số body, truyền {} nếu body rỗng
+    const { data } = await api.post<ApiResponse<ITrack>>(
+      `/tracks/${id}/retry`,
+      {},
+    );
+    return data;
+  },
+
+  // Cập nhật hàng loạt (Bulk Update)
   bulkUpdate: async (trackIds: string[], updates: BulkTrackFormValues) => {
-    // API này nhận JSON, không phải FormData
-    // Lưu ý: Route backend phải match (vd: /tracks/bulk/update)
-    const { data } = await api.patch("/tracks/bulk/update", {
+    const { data } = await api.patch<ApiResponse<any>>("/tracks/bulk/update", {
       trackIds,
       updates,
     });
     return data;
   },
-  // 4. Delete
-  delete: async (id: string) => {
-    return api.delete(`/tracks/${id}`);
-  },
-  getRealtimeChart: async (): Promise<ChartResponse> => {
-    // Gọi endpoint GET mà bạn đã setup ở Backend
-    const response = await api.get<ChartResponse>("/tracks/charts/realtime");
-    return response.data;
+
+  // ==========================================
+  // 4. ANALYTICS (Thống kê)
+  // ==========================================
+
+  getRealtimeChart: async () => {
+    // Giả sử ChartResponse được bọc trong ApiResponse từ backend
+    const { data } = await api.get<ApiResponse<ChartResponse>>(
+      "/tracks/charts/realtime",
+    );
+    return data;
   },
 };
 

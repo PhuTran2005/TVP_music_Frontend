@@ -1,14 +1,16 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Calendar,
   Disc,
   MoreVertical,
   Edit,
   Trash2,
-  PlayCircle,
+  Play,
   EyeOff,
-  Music2,
 } from "lucide-react";
+
 import type { Album } from "@/features/album/types";
 
 // UI Components
@@ -18,9 +20,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useNavigate } from "react-router-dom";
+import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
 
 interface AlbumCardProps {
   album: Album;
@@ -30,65 +33,80 @@ interface AlbumCardProps {
 
 const AlbumCard: React.FC<AlbumCardProps> = ({ album, onEdit, onDelete }) => {
   const navigate = useNavigate();
+
+  const handleNavigate = () => {
+    navigate(`/albums/${album.slug || album._id}`);
+  };
+
+  const handleAction = (e: React.MouseEvent, action: () => void) => {
+    e.stopPropagation(); // Ngăn sự kiện click lan ra ngoài làm chuyển trang
+    action();
+  };
+
   return (
-    <div className="group relative bg-card rounded-xl border border-border shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 flex flex-col overflow-hidden">
-      {/* --- 1. COVER IMAGE --- */}
-      <div className="relative h-32 sm:h-auto sm:aspect-square bg-muted overflow-hidden">
-        {album.coverImage ? (
-          <img
-            src={album.coverImage}
-            alt={album.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-secondary/30">
-            <Music2 className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground/40" />
-          </div>
-        )}
+    <motion.div
+      whileHover={{ y: -4 }}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+      onClick={handleNavigate}
+      className="group cursor-pointer bg-card rounded-xl border border-border shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 flex flex-col overflow-hidden"
+    >
+      {/* ================= ARTWORK ================= */}
+      <div className="relative aspect-square overflow-hidden bg-muted">
+        <ImageWithFallback
+          src={album.coverImage}
+          alt={album.title}
+          className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
 
-        {/* Overlay Play - Desktop Hover */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
-          <button
-            onClick={() => navigate(`/albums/${album.slug}`)}
-            className="transform scale-90 group-hover:scale-100 transition-transform duration-300 text-white hover:text-primary drop-shadow-lg"
-          >
-            <PlayCircle className="w-12 h-12 sm:w-14 sm:h-14 fill-current" />
-          </button>
-        </div>
+        {/* Gradient Overlay for Text/Badges */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 opacity-60 group-hover:opacity-80 transition-opacity" />
 
-        {/* Badges - Floating on top */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+        {/* Top Badges */}
+        <div className="absolute top-2.5 left-2.5 right-2.5 flex justify-between items-start z-10">
+          <Badge className="text-[10px] uppercase tracking-widest bg-black/60 text-white backdrop-blur-md border-none">
+            {album.type || "Album"}
+          </Badge>
+
           {!album.isPublic && (
             <Badge
-              variant="secondary"
-              className="bg-black/70 text-white backdrop-blur border border-white/10 text-[10px] h-5 px-1.5 font-semibold"
+              variant="destructive"
+              className="text-[10px] uppercase tracking-widest shadow-md flex items-center gap-1 bg-red-500/90 hover:bg-red-500"
             >
-              <EyeOff className="w-3 h-3 mr-1" /> Private
+              <EyeOff className="size-3" /> Private
             </Badge>
           )}
-          <Badge
-            variant="default"
-            className="text-[10px] h-5 px-1.5 shadow-sm bg-primary/90 hover:bg-primary border border-primary/20 text-primary-foreground font-bold uppercase tracking-wider"
+        </div>
+
+        {/* Center Play Button Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Button
+            size="icon"
+            className="
+              size-12 sm:size-14 rounded-full
+              bg-primary text-primary-foreground
+              shadow-[0_24px_80px_rgba(0,0,0,0.6)]
+              opacity-0 scale-90
+              transition-all duration-300
+              group-hover:opacity-100 group-hover:scale-100
+            "
           >
-            {album.type}
-          </Badge>
+            <Play className="size-5 sm:size-6 ml-0.5 fill-current" />
+          </Button>
         </div>
       </div>
 
-      {/* --- 2. INFO AREA --- */}
-      <div className="p-3 sm:p-4 flex flex-col gap-1 flex-1">
-        <div className="flex justify-between items-start gap-1">
+      {/* ================= INFO AREA ================= */}
+      <div className="p-4 flex flex-col gap-2 flex-1">
+        <div className="flex justify-between items-start gap-2">
           <div className="min-w-0 flex-1">
             <h3
-              className="font-bold text-sm sm:text-base leading-tight truncate text-foreground hover:text-primary transition-colors cursor-pointer"
+              className="font-bold text-[15px] leading-tight truncate text-foreground group-hover:text-primary transition-colors"
               title={album.title}
-              onClick={() => navigate(`/albums/${album.slug}`)}
             >
               {album.title}
             </h3>
             <p
-              className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer truncate mt-0.5 sm:mt-1 font-medium"
+              className="text-sm text-muted-foreground truncate mt-0.5"
               title={album.artist?.name}
             >
               {album.artist?.name || (
@@ -99,47 +117,48 @@ const AlbumCard: React.FC<AlbumCardProps> = ({ album, onEdit, onDelete }) => {
 
           {/* Action Menu */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 sm:h-8 sm:w-8 -mr-2 text-muted-foreground hover:text-foreground"
+                className="size-8 -mr-2 text-muted-foreground hover:text-foreground shrink-0"
               >
-                <MoreVertical className="w-4 h-4" />
+                <MoreVertical className="size-4" />
                 <span className="sr-only">Open menu</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuContent align="end" className="w-40 rounded-xl">
               <DropdownMenuItem
-                onClick={() => onEdit(album)}
-                className="cursor-pointer font-medium"
+                onClick={(e) => handleAction(e, () => onEdit(album))}
+                className="font-medium cursor-pointer"
               >
-                <Edit className="w-4 h-4 mr-2 text-primary" /> Edit
+                <Edit className="mr-2 size-4 text-primary" /> Edit details
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => onDelete(album)}
-                className="text-destructive focus:text-destructive cursor-pointer font-medium"
+                onClick={(e) => handleAction(e, () => onDelete(album))}
+                className="font-medium text-destructive focus:text-destructive cursor-pointer focus:bg-destructive/10"
               >
-                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                <Trash2 className="mr-2 size-4" /> Delete album
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
         {/* Metadata Footer */}
-        <div className="flex items-center gap-3 mt-auto pt-3 border-t border-border/60 text-[10px] sm:text-xs text-muted-foreground font-medium">
-          <div className="flex items-center gap-1">
-            <Calendar className="w-3 h-3 text-foreground/50" />
+        <div className="flex items-center gap-3 mt-auto pt-3 border-t border-border/50 text-[7px] md:text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="size-3.5 opacity-70" />
             <span>{album.releaseYear || "N/A"}</span>
           </div>
-          <div className="w-1 h-1 rounded-full bg-border" />
-          <div className="flex items-center gap-1">
-            <Disc className="w-3 h-3 text-foreground/50" />
+          <div className="size-1 rounded-full bg-border" />
+          <div className="flex items-center gap-1.5">
+            <Disc className="size-3.5 opacity-70" />
             <span>{album.totalTracks || 0} tracks</span>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

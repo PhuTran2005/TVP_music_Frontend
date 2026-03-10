@@ -1,4 +1,4 @@
-import { type Track } from "@/features/track/types";
+import { ITrack } from "@/features/track/types";
 import { type User } from "@/features/user/types";
 
 export type PlaylistVisibility = "public" | "private" | "unlisted";
@@ -17,7 +17,7 @@ export interface Playlist {
   collaborators: User[];
 
   // Danh sách bài hát (Dạng phẳng hoặc dạng lồng tùy API của bạn)
-  tracks: Track[];
+  tracks: ITrack[];
 
   visibility: PlaylistVisibility;
   type: PlaylistType;

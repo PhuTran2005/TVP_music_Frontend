@@ -6,10 +6,10 @@ import PublicArtistCard from "@/features/artist/components/PublicArtistCard";
 import { Artist } from "@/features/artist/types";
 import { HorizontalScroll } from "@/pages/client/home/HorizontalScroll";
 import { SectionHeader } from "@/pages/client/home/SectionHeader";
-import { useSpotlightArtist } from "@/features/artist/hooks/useArtistPublic";
+import { useSpotlightArtists } from "@/features/artist/hooks/useArtistsQuery";
 
 export function ArtistSpotlight() {
-  const { data: artists, isLoading } = useSpotlightArtist(4);
+  const { data: artists, isLoading } = useSpotlightArtists(5);
 
   return (
     <section className="py-16 lg:py-24 bg-background border-b border-border/40 relative">

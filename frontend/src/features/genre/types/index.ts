@@ -29,7 +29,7 @@ export interface GenreDetail extends Genre {
 export interface GenreFilterParams {
   page: number;
   limit: number;
-  status?: "active" | "inactive";
+  status?: "active" | "inactive" | "all";
   keyword?: string;
   isTrending?: boolean; // Filter theo trending
   parentId?: string | "root"; // Filter theo cha

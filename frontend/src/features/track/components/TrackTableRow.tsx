@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDuration, STATUS_CONFIG } from "@/utils/track-helper";
 import { toast } from "sonner";
-import { Track } from "@/features/track/types";
+import { ITrack, Track } from "@/features/track/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link } from "react-router-dom";
 
@@ -43,7 +43,7 @@ interface TrackTableRowProps {
   onPlay: () => void;
   onEdit: (track: Track) => void;
   onDelete: (track: Track) => void;
-  onRetry: (id: string) => Promise<void>;
+  onRetry: (Track: ITrack) => Promise<void>;
 }
 
 export const TrackTableRow = memo(
@@ -60,13 +60,13 @@ export const TrackTableRow = memo(
     onRetry,
   }: TrackTableRowProps) => {
     const [isRetrying, setIsRetrying] = useState(false);
-
+    console.log("Rendering TrackTableRow:", track);
     const handleRetry = async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (isRetrying) return;
       setIsRetrying(true);
       try {
-        await onRetry(track._id);
+        await onRetry(track);
         toast.success("Retry queued");
       } catch {
         toast.error("Retry failed");
@@ -90,7 +90,7 @@ export const TrackTableRow = memo(
           isActive && "bg-primary/5 hover:bg-primary/10",
           isSelected && "bg-secondary/40",
           track.status === "failed" &&
-            "bg-destructive/5 hover:bg-destructive/10"
+            "bg-destructive/5 hover:bg-destructive/10",
         )}
       >
         {/* Checkbox */}
@@ -134,7 +134,7 @@ export const TrackTableRow = memo(
                 src={track.coverImage}
                 className={cn(
                   "size-full object-cover transition",
-                  isActive && "opacity-60"
+                  isActive && "opacity-60",
                 )}
               />
               {track.status === "ready" && (
@@ -152,7 +152,7 @@ export const TrackTableRow = memo(
               <p
                 className={cn(
                   "font-bold truncate",
-                  isActive ? "text-primary" : "text-foreground"
+                  isActive ? "text-primary" : "text-foreground",
                 )}
               >
                 {track.title}
@@ -233,7 +233,7 @@ export const TrackTableRow = memo(
             </Tooltip>
           </TooltipProvider>
 
-          {track.status === "failed" && (
+          {(track.status === "failed" || track.status === "pending") && (
             <Button
               size="icon"
               variant="ghost"
@@ -277,7 +277,7 @@ export const TrackTableRow = memo(
         </TableCell>
       </TableRow>
     );
-  }
+  },
 );
 
 TrackTableRow.displayName = "TrackTableRow";

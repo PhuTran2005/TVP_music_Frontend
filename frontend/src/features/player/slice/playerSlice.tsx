@@ -6,7 +6,7 @@
 
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "@/store/store";
-import type { Track } from "@/features/track/types";
+import { ITrack } from "@/features/track/types";
 
 // ============================================================================
 // 1. HELPER: SMART SHUFFLE (Spotify Style)
@@ -15,13 +15,13 @@ import type { Track } from "@/features/track/types";
 /**
  * Thuật toán Shuffle thông minh: Tránh xếp 2 bài cùng ca sĩ cạnh nhau.
  */
-const smartShuffle = (tracks: Track[], currentTrack: Track): Track[] => {
+const smartShuffle = (tracks: ITrack[], currentTrack: ITrack): ITrack[] => {
   const result = [currentTrack];
   const pool = tracks.filter((t) => t._id !== currentTrack._id);
 
   while (pool.length > 0) {
     let attempts = 0;
-    let chosen: Track | null = null;
+    let chosen: ITrack | null = null;
 
     // Thử tìm bài khác ca sĩ với bài trước đó
     while (attempts < 3 && pool.length > 0) {
@@ -53,11 +53,11 @@ const smartShuffle = (tracks: Track[], currentTrack: Track): Track[] => {
 // ============================================================================
 
 interface PlayerState {
-  currentTrack: Track | null;
+  currentTrack: ITrack | null;
 
   // Dual Queue: Giữ danh sách gốc để khi tắt Shuffle có thể khôi phục
-  originalQueue: Track[];
-  activeQueue: Track[];
+  originalQueue: ITrack[];
+  activeQueue: ITrack[];
   currentIndex: number;
 
   // Playback Status
@@ -79,7 +79,7 @@ interface PlayerState {
   isShuffling: boolean;
 
   // Gapless Playback (Preload bài tiếp theo)
-  nextTrackPreloaded: Track | null;
+  nextTrackPreloaded: ITrack | null;
 }
 
 const initialState: PlayerState = {
@@ -110,7 +110,7 @@ const playerSlice = createSlice({
     // --- Queue Management ---
     setQueue: (
       state,
-      action: PayloadAction<{ tracks: Track[]; startIndex: number }>
+      action: PayloadAction<{ tracks: ITrack[]; startIndex: number }>,
     ) => {
       const { tracks, startIndex } = action.payload;
       state.originalQueue = tracks;
@@ -187,13 +187,13 @@ const playerSlice = createSlice({
       if (state.isShuffling) {
         state.activeQueue = smartShuffle(
           state.originalQueue,
-          state.currentTrack
+          state.currentTrack,
         );
         state.currentIndex = 0;
       } else {
         state.activeQueue = state.originalQueue;
         state.currentIndex = state.originalQueue.findIndex(
-          (t) => t._id === state.currentTrack?._id
+          (t) => t._id === state.currentTrack?._id,
         );
       }
 

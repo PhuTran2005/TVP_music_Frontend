@@ -1,38 +1,55 @@
 import { z } from "zod";
 
-// --- 1. ADMIN CREATE SCHEMA ---
-export const createUserSchema = z.object({
-  fullName: z.string().min(2, "Họ tên quá ngắn").max(50),
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
+
+// --- SHARED RULES ---
+const passwordRule = z
+  .string()
+  .min(6, "Mật khẩu tối thiểu 6 ký tự")
+  .optional()
+  .or(z.literal(""));
+const avatarRule = z
+  .union([z.instanceof(File), z.string(), z.null()])
+  .refine((file) => {
+    if (file instanceof File) return file.size <= MAX_AVATAR_SIZE;
+    return true;
+  }, "Ảnh tối đa 5MB")
+  .refine((file) => {
+    if (file instanceof File) return ACCEPTED_IMAGE_TYPES.includes(file.type);
+    return true;
+  }, "Định dạng không hỗ trợ")
+  .optional()
+  .nullable();
+
+// --- 1. ADMIN CREATE/UPDATE USER ---
+export const adminUserSchema = z.object({
+  fullName: z.string().trim().min(2, "Tên quá ngắn").max(50),
   email: z.string().email("Email không hợp lệ"),
   role: z.enum(["user", "artist", "admin"]),
-  avatar: z.any().optional(), // File object
+
+  // Chỉ Admin mới được sửa các field này
+  isActive: z.boolean().default(true),
+  isVerified: z.boolean().default(false),
+
+  // Password optional khi edit
+  password: passwordRule,
+  avatar: avatarRule,
+  bio: z.string().max(500).optional(),
 });
 
-export type CreateUserFormValues = z.infer<typeof createUserSchema>;
+export type AdminUserFormValues = z.infer<typeof adminUserSchema>;
 
-// --- 2. ADMIN UPDATE SCHEMA ---
-export const adminUpdateUserFormSchema = z.object({
-  fullName: z.string().min(2).max(50),
-  email: z.string().email(),
-  role: z.enum(["user", "artist", "admin"]),
-  isActive: z.boolean(),
-  isVerified: z.boolean(),
-  password: z.string().min(6).optional().or(z.literal("")),
-  avatar: z.any().optional(),
+// --- 2. USER PROFILE UPDATE (Self) ---
+export const profileSchema = z.object({
+  fullName: z.string().trim().min(2).max(50),
+  bio: z.string().max(500).optional(),
+  avatar: avatarRule,
 });
 
-export type AdminUpdateUserFormValues = z.infer<
-  typeof adminUpdateUserFormSchema
->;
-export const claimSchema = z
-  .object({
-    newEmail: z.string().email("Email không hợp lệ"),
-    newPassword: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Mật khẩu xác nhận không khớp",
-    path: ["confirmPassword"],
-  });
-
-export type ClaimInput = z.infer<typeof claimSchema>;
+export type ProfileFormValues = z.infer<typeof profileSchema>;

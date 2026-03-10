@@ -1,27 +1,30 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Plus,
-  MoreHorizontal,
   PenSquare,
   Trash2,
   Music,
-  Eye,
-  EyeOff,
   CornerDownRight,
   TrendingUp,
   ListMusic,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  MoreVertical,
+  Layers,
+  FolderTree,
 } from "lucide-react";
 
 import { APP_CONFIG } from "@/config/constants";
 import { cn } from "@/lib/utils";
-import type { Genre, GenreFilterParams } from "@/features/genre/types";
-import {
-  useDeleteGenre,
-  useGenres,
-  useToggleGenreStatus,
-} from "@/features/genre/hooks/useGenreAdmin";
+import type { Genre } from "@/features/genre/types";
 
-// --- UI Components ---
+// Hooks
+import { useGenreParams } from "@/features/genre/hooks/useGenreParams";
+import { useGenreMutations } from "@/features/genre/hooks/useGenreMutations";
+import { useGenresQuery } from "@/features/genre/hooks/useGenresQuery";
+
+// UI Components
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -40,37 +43,50 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import PageHeader from "@/components/ui/PageHeader";
 import Pagination from "@/utils/pagination";
 import MusicResult from "@/components/ui/Result";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import GenreModal from "@/features/genre/components/GenreModal";
 import TableSkeleton from "@/components/ui/TableSkeleton";
-import GenreFilters from "@/features/genre/components/GenreFilters";
+import { GenreFilters } from "@/features/genre/components/GenreFilters";
+import { Link } from "react-router-dom";
+import { toast } from "sonner"; // Giả sử bạn dùng sonner để thông báo
+import { handleError } from "@/utils/handleError";
 
 const GenreManagementPage = () => {
-  const [params, setParams] = useState<GenreFilterParams>({
-    page: 1,
-    limit: APP_CONFIG.PAGINATION_LIMIT,
-    sort: "priority",
-    keyword: "",
-    status: undefined,
-    parentId: undefined,
-    isTrending: undefined,
-  });
+  // --- 1. STATE & DATA FETCHING ---
+  const {
+    filterParams,
+    handleSearch,
+    handleFilterChange,
+    handlePageChange,
+    clearFilters,
+  } = useGenreParams(APP_CONFIG.PAGINATION_LIMIT);
 
+  const { data, isLoading, isFetching, isError } = useGenresQuery(filterParams);
+
+  // --- 2. MUTATIONS ---
+  const {
+    createGenreAsync,
+    updateGenreAsync,
+    deleteGenre,
+    toggleGenreStatus,
+    isMutating,
+  } = useGenreMutations();
+
+  // --- 3. LOCAL UI STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [genreToEdit, setGenreToEdit] = useState<Genre | null>(null);
   const [genreToDelete, setGenreToDelete] = useState<Genre | null>(null);
 
-  const { data, isLoading, isError, isFetching } = useGenres(params);
-  const deleteMutation = useDeleteGenre();
-  const toggleStatusMutation = useToggleGenreStatus();
-
-  const genreData = data?.data.data || [];
-  const totalPages = data?.data.meta.totalPages || 0;
-  const totalItems = data?.data.meta.totalItems || 0;
-
+  // --- 4. HANDLERS ---
   const handleOpenCreate = () => {
     setGenreToEdit(null);
     setIsModalOpen(true);
@@ -82,18 +98,51 @@ const GenreManagementPage = () => {
   };
 
   const handleDelete = () => {
-    if (genreToDelete)
-      deleteMutation.mutate(genreToDelete._id, {
-        onSuccess: () => setGenreToDelete(null),
+    if (genreToDelete) {
+      deleteGenre(genreToDelete._id, {
+        onSuccess: () => {
+          setGenreToDelete(null);
+          toast.success("Genre deleted successfully");
+        },
       });
+    }
   };
 
-  const handleToggle = (genre: Genre) => {
-    toggleStatusMutation.mutate(genre._id);
+  const handleToggleStatus = async (genre: Genre) => {
+    try {
+      await toggleGenreStatus(genre._id);
+      toast.success(
+        genre.isActive
+          ? "Genre archived successfully"
+          : "Genre published successfully",
+      );
+    } catch (error) {
+      handleError(error, "Lỗi cập nhật trạng thái");
+    }
   };
 
-  const handlePageChange = (newPage: number) => {
-    setParams((prev) => ({ ...prev, page: newPage }));
+  const handleSubmitForm = async (formData: FormData) => {
+    try {
+      if (genreToEdit) {
+        await updateGenreAsync({ id: genreToEdit._id, data: formData });
+        toast.success("Genre updated successfully");
+      } else {
+        await createGenreAsync(formData);
+        toast.success("Genre created successfully");
+      }
+      setIsModalOpen(false);
+    } catch (error) {
+      handleError(error, "Lỗi tạo thể loại");
+    }
+  };
+
+  // --- 5. RENDER LOGIC ---
+  const genreData = useMemo(() => data?.genres || [], [data]);
+  const meta = data?.meta || {
+    totalPages: 0,
+    totalItems: 0,
+    page: 1,
+    pageSize: 10,
   };
 
   if (isError) {
@@ -101,229 +150,298 @@ const GenreManagementPage = () => {
       <div className="h-[60vh] flex items-center justify-center">
         <MusicResult
           status="error"
-          title="Failed to load genres"
-          description="Please try again later."
+          title="Connection Error"
+          description="We couldn't reach the server. Please try again."
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-10 max-w-[1600px] mx-auto ">
       {/* --- HEADER --- */}
       <PageHeader
-        title="Genres Management"
-        subtitle={`Managing ${totalItems} genres in hierarchy structure.`}
+        title="Genres Library"
+        subtitle={`Organizing ${meta.totalItems} music styles in your system.`}
         action={
           <Button
             onClick={handleOpenCreate}
-            className="shadow-md bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6"
+            className="shadow-lg bg-primary hover:bg-primary/90 font-bold px-6 transition-all active:scale-95"
           >
-            <Plus className="size-4 mr-2" /> Add Genre
+            <Plus className="size-4 mr-2" /> New Genre
           </Button>
         }
       />
 
       {/* --- FILTERS --- */}
-      <GenreFilters params={params} setParams={setParams} />
+      <div className="bg-card rounded-2xl shadow-sm">
+        <GenreFilters
+          params={filterParams}
+          onSearch={handleSearch}
+          onFilterChange={handleFilterChange}
+          onReset={clearFilters}
+        />
+      </div>
 
       {/* --- TABLE --- */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-border bg-card shadow-xl overflow-hidden transition-all relative">
+        {/* Loading overlay khi đang fetching ngầm */}
+        {isFetching && !isLoading && (
+          <div className="absolute top-0 left-0 w-full h-1 bg-primary/20 animate-pulse z-10" />
+        )}
+
         <Table>
           <TableHeader>
-            <TableRow className="bg-secondary/50 hover:bg-secondary/50">
-              <TableHead className="w-[60px] font-bold text-foreground/80">
+            <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
+              <TableHead className="w-[60px] font-bold text-center text-xs uppercase tracking-wider">
                 #
               </TableHead>
-              <TableHead className="w-[300px] font-bold text-foreground/80">
-                Genre Info
+              <TableHead className="min-w-[300px] font-bold text-xs uppercase tracking-wider">
+                Identity
               </TableHead>
-              <TableHead className="font-bold text-foreground/80">
-                Parent Genre
+              <TableHead className="w-[180px] font-bold text-center text-xs uppercase tracking-wider">
+                Level
               </TableHead>
-              <TableHead className="font-bold text-foreground/80">
-                Stats
+              <TableHead className="w-[150px] font-bold text-xs uppercase tracking-wider">
+                Content
               </TableHead>
-              <TableHead className="font-bold text-foreground/80">
-                Priority
+              <TableHead className="w-[120px] font-bold text-xs uppercase tracking-wider">
+                Ranking
               </TableHead>
-              <TableHead className="font-bold text-foreground/80">
+              <TableHead className="w-[140px] font-bold text-xs uppercase tracking-wider">
                 Status
               </TableHead>
-              <TableHead className="text-right font-bold text-foreground/80">
+              <TableHead className="text-right font-bold text-xs uppercase tracking-wider pr-6">
                 Actions
               </TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
-            {isLoading || (isFetching && params.page === 1) ? (
-              <TableSkeleton rows={APP_CONFIG.PAGINATION_LIMIT} cols={7} />
+            {isLoading ? (
+              <TableSkeleton rows={meta.pageSize || 10} cols={7} hasAvatar />
             ) : genreData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-[300px]">
+                <TableCell colSpan={7} className="h-[450px]">
                   <MusicResult
                     status="empty"
                     title="No genres found"
-                    description="Create a new genre to get started."
+                    description="Try adjusting your filters or create a new genre style."
                   />
                 </TableCell>
               </TableRow>
             ) : (
               genreData.map((genre: Genre, index: number) => {
-                const parentName =
-                  typeof genre.parentId === "object" && genre.parentId
-                    ? (genre.parentId as Genre).name
-                    : null;
+                const parent = genre.parentId as Genre | null;
+
                 return (
                   <TableRow
                     key={genre._id}
-                    className="group hover:bg-muted/30 transition-colors"
+                    className="group hover:bg-muted/40 transition-colors duration-150 border-b last:border-0"
                   >
-                    <TableCell className="font-mono text-muted-foreground text-xs font-medium">
-                      {(params.page - 1) * APP_CONFIG.PAGINATION_LIMIT +
-                        index +
-                        1}
+                    {/* INDEX */}
+                    <TableCell className="text-center">
+                      <span className="font-mono text-[11px] text-muted-foreground/50 font-medium">
+                        {String(
+                          (meta.page - 1) *
+                            (meta.pageSize || APP_CONFIG.PAGINATION_LIMIT) +
+                            index +
+                            1,
+                        ).padStart(2, "0")}
+                      </span>
                     </TableCell>
 
-                    {/* --- INFO --- */}
+                    {/* IDENTITY */}
                     <TableCell>
                       <div className="flex items-center gap-4">
-                        <div className="size-11 rounded-lg overflow-hidden border border-border bg-background flex items-center justify-center shrink-0 relative shadow-sm">
-                          {genre.image ? (
-                            <img
-                              src={genre.image}
-                              alt={genre.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Music className="size-5 text-muted-foreground/50" />
-                          )}
-                          {/* Color Dot */}
+                        <div className="relative shrink-0">
+                          <div className="size-12 rounded-xl overflow-hidden border-2 border-background shadow-md bg-muted group-hover:scale-105 transition-transform duration-300">
+                            {genre.image ? (
+                              <img
+                                src={genre.image}
+                                alt={genre.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-primary/5">
+                                <Music className="size-5 text-primary/30" />
+                              </div>
+                            )}
+                          </div>
                           <div
-                            className="absolute bottom-0 right-0 w-3 h-3 rounded-full border border-white shadow-sm"
-                            style={{ backgroundColor: genre.color || "#000" }}
+                            className="absolute -bottom-1 -right-1 size-4 rounded-full border-2 border-background shadow-sm"
+                            style={{
+                              backgroundColor: genre.color || "#CBD5E1",
+                            }}
                           />
                         </div>
 
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-bold text-sm text-foreground flex items-center gap-2">
-                            {genre.parentId && (
-                              <CornerDownRight className="size-3 text-muted-foreground" />
-                            )}
+                        <div className="flex flex-col min-w-0">
+                          <Link
+                            to={`/genres/${genre.slug || genre._id}`}
+                            className="font-bold text-sm text-foreground hover:text-primary transition-colors truncate flex items-center gap-1.5"
+                          >
                             {genre.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {genre.parentId && (
+                              <CornerDownRight className="size-3 text-muted-foreground/40" />
+                            )}
+                          </Link>
+                          <span className="text-[11px] text-muted-foreground line-clamp-1 italic">
                             {genre.description || "No description provided"}
                           </span>
                         </div>
                       </div>
                     </TableCell>
 
-                    {/* --- PARENT --- */}
-                    <TableCell>
-                      {parentName ? (
+                    {/* HIERARCHY */}
+                    <TableCell className="text-center">
+                      {parent ? (
                         <Badge
                           variant="outline"
-                          className="font-medium text-foreground/80 bg-background border-input"
+                          className="bg-primary/5 text-primary border-primary/10 hover:bg-primary/20 font-medium transition-colors"
                         >
-                          {parentName}
+                          <FolderTree className="size-3 mr-1.5" /> {parent.name}
                         </Badge>
                       ) : (
-                        <span className="text-xs text-muted-foreground italic font-medium opacity-60">
-                          Root Level
-                        </span>
+                        <Badge
+                          variant="secondary"
+                          className="bg-muted/50 text-muted-foreground/60 border-transparent font-normal"
+                        >
+                          <Layers className="size-3 mr-1.5 opacity-40" /> Master
+                        </Badge>
                       )}
                     </TableCell>
 
-                    {/* --- STATS --- */}
+                    {/* METRICS */}
                     <TableCell>
-                      <div className="flex items-center gap-2 text-xs font-medium text-foreground/80">
-                        <ListMusic className="size-3.5 text-primary" />
-                        <span>{genre.trackCount || 0} Tracks</span>
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 text-[11px] font-bold">
+                          <ListMusic className="size-3 text-primary" />
+                          <span>{genre.trackCount || 0} Tracks</span>
+                        </div>
+                        <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary/40 transition-all duration-1000"
+                            style={{
+                              width: `${Math.min((genre.trackCount || 0) * 2, 100)}%`,
+                            }}
+                          />
+                        </div>
                       </div>
                     </TableCell>
 
-                    {/* --- PRIORITY --- */}
+                    {/* DISCOVERY */}
                     <TableCell>
-                      <div className="flex flex-col gap-1.5 items-start">
-                        <span className="font-mono text-xs bg-muted/50 px-2 py-0.5 rounded border border-border">
-                          {genre.priority || 0}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-muted-foreground/50">
+                          RANK: {genre.priority || 0}
                         </span>
                         {genre.isTrending && (
-                          <Badge
-                            variant="secondary"
-                            className="bg-orange-500/10 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0 h-5 font-bold"
-                          >
-                            <TrendingUp className="size-3 mr-1" /> Trending
-                          </Badge>
+                          <div className="flex items-center text-[9px] font-black text-orange-500 bg-orange-500/10 w-fit px-2 py-0.5 rounded-full border border-orange-500/20 shadow-sm animate-pulse">
+                            <TrendingUp className="size-2.5 mr-1" /> TRENDING
+                          </div>
                         )}
                       </div>
                     </TableCell>
 
-                    {/* --- STATUS --- */}
+                    {/* VISIBILITY */}
                     <TableCell>
-                      <Badge
-                        variant={genre.isActive ? "default" : "secondary"}
+                      <div
                         className={cn(
-                          "rounded-full font-bold shadow-none cursor-pointer hover:opacity-90 transition-all px-3 py-0.5 border",
+                          "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black border shadow-sm transition-all",
                           genre.isActive
-                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-                            : "bg-muted text-muted-foreground border-border hover:bg-muted/80",
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            : "bg-destructive/10 text-destructive border-destructive/20",
                         )}
-                        onClick={() => handleToggle(genre)}
                       >
-                        {genre.isActive ? "Active" : "Hidden"}
-                      </Badge>
+                        <div
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            genre.isActive
+                              ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                              : "bg-destructive/30",
+                          )}
+                        />
+                        {genre.isActive ? "PUBLISHED" : "HIDDEN"}
+                      </div>
                     </TableCell>
 
-                    {/* --- ACTIONS --- */}
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    {/* ACTIONS */}
+                    <TableCell className="text-right pr-6">
+                      <div className="flex items-center justify-end gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenEdit(genre)}
+                                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-all text-muted-foreground hover:text-primary hover:bg-primary/5"
+                              >
+                                <PenSquare className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Quick Edit</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 transition-colors active:bg-muted"
+                            >
+                              <MoreVertical className="size-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-52 p-1.5 shadow-xl border-border/50"
                           >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 p-1">
-                          <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-                            Actions
-                          </DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => handleOpenEdit(genre)}
-                            className="font-medium cursor-pointer"
-                          >
-                            <PenSquare className="mr-2 size-4 text-primary" />{" "}
-                            Edit details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleToggle(genre)}
-                            className="font-medium cursor-pointer"
-                          >
-                            {genre.isActive ? (
-                              <>
-                                <EyeOff className="mr-2 size-4 text-muted-foreground" />{" "}
-                                Hide genre
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="mr-2 size-4 text-emerald-600" />{" "}
-                                Show genre
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="my-1 bg-border/50" />
-                          <DropdownMenuItem
-                            onClick={() => setGenreToDelete(genre)}
-                            className="text-destructive focus:text-destructive focus:bg-destructive/10 font-medium cursor-pointer"
-                          >
-                            <Trash2 className="mr-2 size-4" /> Delete genre
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <DropdownMenuLabel className="text-[10px] uppercase font-bold text-muted-foreground/60 px-2 py-2">
+                              Management
+                            </DropdownMenuLabel>
+
+                            <DropdownMenuItem
+                              onClick={() => handleOpenEdit(genre)}
+                              className="rounded-lg cursor-pointer"
+                            >
+                              <ExternalLink className="mr-2 size-4 text-primary" />{" "}
+                              View Analytics
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => handleToggleStatus(genre)}
+                              className="rounded-lg cursor-pointer"
+                              disabled={isMutating}
+                            >
+                              {genre.isActive ? (
+                                <>
+                                  <EyeOff className="mr-2 size-4 text-orange-500" />{" "}
+                                  Archive Genre
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="mr-2 size-4 text-emerald-500" />{" "}
+                                  Publish Genre
+                                </>
+                              )}
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator className="my-1.5" />
+
+                            <DropdownMenuItem
+                              onClick={() => setGenreToDelete(genre)}
+                              className="rounded-lg text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                              disabled={isMutating}
+                            >
+                              <Trash2 className="mr-2 size-4" /> Permanent
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -334,14 +452,16 @@ const GenreManagementPage = () => {
       </div>
 
       {/* --- FOOTER --- */}
-      {genreData.length > 0 && (
-        <Pagination
-          currentPage={params.page}
-          totalPages={totalPages || 1}
-          onPageChange={handlePageChange}
-          totalItems={totalItems}
-          itemsPerPage={APP_CONFIG.PAGINATION_LIMIT}
-        />
+      {!isLoading && genreData.length > 0 && (
+        <div className="bg-card border rounded-2xl p-4 shadow-sm">
+          <Pagination
+            currentPage={meta.page}
+            totalPages={meta.totalPages}
+            onPageChange={handlePageChange}
+            totalItems={meta.totalItems}
+            itemsPerPage={meta.pageSize || APP_CONFIG.PAGINATION_LIMIT}
+          />
+        </div>
       )}
 
       {/* --- MODALS --- */}
@@ -349,24 +469,32 @@ const GenreManagementPage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         genreToEdit={genreToEdit}
+        onSubmit={handleSubmitForm}
+        isPending={isMutating}
       />
 
       <ConfirmationModal
         isOpen={!!genreToDelete}
         onCancel={() => setGenreToDelete(null)}
         onConfirm={handleDelete}
-        title="Delete Genre?"
+        isLoading={isMutating}
+        title="Confirm Deletion"
         description={
-          <span>
-            Are you sure you want to delete{" "}
-            <strong className="text-foreground">{genreToDelete?.name}</strong>?
-            <br />
-            <span className="text-destructive font-bold text-sm mt-2 block bg-destructive/10 p-2 rounded border border-destructive/20">
-              Warning: All child genres (if any) will become root genres.
-            </span>
-          </span>
+          <div className="space-y-3">
+            <p>
+              Are you sure you want to remove{" "}
+              <strong>{genreToDelete?.name}</strong>?
+            </p>
+            <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-xl text-xs text-destructive leading-relaxed font-medium">
+              <span className="font-bold flex items-center gap-1.5 mb-1">
+                <Trash2 className="size-3" /> Warning
+              </span>
+              This action cannot be undone. All tracks associated with this
+              genre will lose this classification.
+            </div>
+          </div>
         }
-        confirmLabel="Yes, Delete"
+        confirmLabel={isMutating ? "Deleting..." : "Confirm Delete"}
         isDestructive
       />
     </div>

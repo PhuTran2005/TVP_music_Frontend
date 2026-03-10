@@ -1,11 +1,11 @@
 import api from "@/lib/axios";
 import type { ApiResponse, PagedResponse } from "@/types";
 import type { Artist, ArtistDetail, ArtistFilterParams } from "../types";
-import type { ArtistFormValues } from "@/features/artist/schemas/artist.schema";
-import { buildFormData } from "@/utils/form-data";
 
 const artistApi = {
-  // --- PUBLIC ---
+  // ==========================================
+  // PUBLIC METHODS
+  // ==========================================
   getAll: async (params: ArtistFilterParams) => {
     const res = await api.get<ApiResponse<PagedResponse<Artist>>>("/artists", {
       params,
@@ -15,55 +15,58 @@ const artistApi = {
 
   getDetail: async (slugOrId: string) => {
     const res = await api.get<ApiResponse<ArtistDetail>>(
-      `/artists/${slugOrId}`
+      `/artists/${slugOrId}`,
     );
     return res.data;
   },
 
-  // --- ADMIN ---
-  adminCreate: async (data: ArtistFormValues) => {
-    const formData = buildFormData(data);
-    console.log(data, ...formData);
-    const res = await api.post<ApiResponse<Artist>>("/artists", formData, {
+  // ==========================================
+  // ADMIN METHODS
+  // ==========================================
+
+  // 🔥 FIX: Nhận trực tiếp FormData (đã build từ Hook)
+  adminCreate: async (data: FormData) => {
+    // const res = await api.post<ApiResponse<Artist>>("/artists", data, {
+    //   headers: { "Content-Type": "multipart/form-data" },
+    // });
+    // return res.data;
+  },
+
+  // 🔥 FIX: Nhận FormData cho update (Avatar, Cover, Info...)
+  adminUpdate: async (id: string, data: FormData) => {
+    const res = await api.patch<ApiResponse<Artist>>(`/artists/${id}`, data, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return res.data;
   },
 
-  adminUpdate: async (id: string, data: Partial<ArtistFormValues>) => {
-    const formData = buildFormData(data);
-    console.log(data, ...formData);
-    const res = await api.patch<ApiResponse<Artist>>(
-      `/artists/${id}`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
+  // Toggle Status (Gửi JSON thường)
+  adminToggleStatus: async (id: string) => {
+    const res = await api.patch<ApiResponse<Artist>>(`/artists/${id}/toggle`);
     return res.data;
   },
 
-  adminToggleStatus: async (id: string) => {
-    return (await api.patch<ApiResponse<Artist>>(`/artists/${id}/toggle`)).data;
-  },
-
   adminDelete: async (id: string) => {
-    return (await api.delete<ApiResponse<Artist>>(`/artists/${id}`)).data;
+    const res = await api.delete<ApiResponse<Artist>>(`/artists/${id}`);
+    return res.data;
   },
 
-  // --- ARTIST SELF ---
+  // ==========================================
+  // ARTIST SELF METHODS (Profile)
+  // ==========================================
   getMyProfile: async () => {
     const res = await api.get<ApiResponse<Artist>>("/artists/me/profile");
     return res.data;
   },
 
-  updateMyProfile: async (data: ArtistFormValues) => {
+  // 🔥 FIX: Profile update thường có ảnh -> Dùng FormData
+  updateMyProfile: async (data: FormData) => {
     const res = await api.patch<ApiResponse<Artist>>(
       "/artists/me/profile",
-      buildFormData(data),
+      data,
       {
         headers: { "Content-Type": "multipart/form-data" },
-      }
+      },
     );
     return res.data;
   },

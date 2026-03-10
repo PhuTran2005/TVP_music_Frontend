@@ -1,23 +1,27 @@
+// src/features/search/api/searchApi.ts
+import api from "@/lib/axios";
 import { SearchInput } from "@/features/search/schemas/search.schema";
 import { SearchResponse, SearchData } from "../types";
-import api from "@/lib/axios";
+
+const EMPTY_SEARCH_DATA: SearchData = {
+  topResult: null,
+  tracks: [],
+  artists: [],
+  albums: [],
+  playlists: [],
+};
 
 export const searchApi = {
   search: async (params: SearchInput): Promise<SearchData> => {
-    // Nếu query rỗng, trả về data rỗng ngay lập tức để đỡ gọi API thừa
-    if (!params.q) {
-      return {
-        topResult: null,
-        tracks: [],
-        artists: [],
-        albums: [],
-        playlists: [],
-      };
+    // Nếu query rỗng hoặc toàn dấu cách, trả về bộ khung rỗng lập tức
+    if (!params.q || !params.q.trim()) {
+      return EMPTY_SEARCH_DATA;
     }
 
-    const { data } = await api.get<SearchResponse>("/search", {
-      params,
-    });
-    return data.data;
+    // Truyền trực tiếp params vào axios
+    const { data } = await api.get<SearchResponse>("/search", { params });
+
+    // Fallback an toàn nếu backend trả về null/undefined cho data
+    return data.data || EMPTY_SEARCH_DATA;
   },
 };

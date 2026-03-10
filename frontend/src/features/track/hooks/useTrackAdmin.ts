@@ -90,12 +90,14 @@ export const useTrackAdmin = (initialLimit = 10, initialGenreId?: string) => {
 
   // --- D. RETRY TRANSCODE ---
   const retryTranscodeMutation = useMutation({
-    mutationFn: trackApi.retryTranscode,
+    // Đảm bảo truyền đúng id vào API call
+    mutationFn: (id: string) => trackApi.retryTranscode(id),
+
     onSuccess: () => {
       toast.success("Đã gửi lệnh xử lý lại!");
       queryClient.invalidateQueries({ queryKey: trackKeys.lists() });
     },
-    onError: (err) => handleError(err, "Lỗi khi retry"),
+    onError: (err) => handleError(err, "Lỗi khi thực hiện retry"),
   });
 
   // --- E. BULK UPDATE ---

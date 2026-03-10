@@ -89,7 +89,7 @@ export const useAudioPlayer = () => {
   // ============================================================================
   useEffect(() => {
     if (!currentTrack || !audioRef.current) return;
-
+    console.log(currentTrack);
     const audio = audioRef.current;
     const src = currentTrack.hlsUrl || currentTrack.trackUrl;
 
@@ -130,7 +130,7 @@ export const useAudioPlayer = () => {
               if (retryCountRef.current < MAX_RETRY_COUNT) {
                 retryCountRef.current++;
                 console.warn(
-                  `[HLS] Network error, retrying (${retryCountRef.current}/${MAX_RETRY_COUNT})...`
+                  `[HLS] Network error, retrying (${retryCountRef.current}/${MAX_RETRY_COUNT})...`,
                 );
                 hls.startLoad();
               } else {
@@ -249,16 +249,16 @@ export const useAudioPlayer = () => {
       });
 
       navigator.mediaSession.setActionHandler("play", () =>
-        dispatch(setIsPlaying(true))
+        dispatch(setIsPlaying(true)),
       );
       navigator.mediaSession.setActionHandler("pause", () =>
-        dispatch(setIsPlaying(false))
+        dispatch(setIsPlaying(false)),
       );
       navigator.mediaSession.setActionHandler("previoustrack", () =>
-        dispatch(prevTrack(audioRef.current?.currentTime))
+        dispatch(prevTrack(audioRef.current?.currentTime)),
       );
       navigator.mediaSession.setActionHandler("nexttrack", () =>
-        dispatch(nextTrack())
+        dispatch(nextTrack()),
       );
 
       // 🔥 Thêm handler Seek cho Media Session (thanh control trên điện thoại)
@@ -318,7 +318,7 @@ export const useAudioPlayer = () => {
 
   const getCurrentTime = useCallback(
     () => audioRef.current?.currentTime || 0,
-    []
+    [],
   );
 
   const seek = useCallback(
@@ -331,7 +331,7 @@ export const useAudioPlayer = () => {
         dispatch(seekTo(validTime));
       }
     },
-    [dispatch]
+    [dispatch],
   );
 
   return {

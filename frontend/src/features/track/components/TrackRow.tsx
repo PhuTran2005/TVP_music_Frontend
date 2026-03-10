@@ -1,6 +1,6 @@
 // src/features/track/components/TrackRow.tsx
 import React, { memo } from "react";
-import { Play, Pause, Heart, MoreHorizontal } from "lucide-react";
+import { Play, Pause, MoreHorizontal } from "lucide-react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,12 +10,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { Track } from "@/features/track/types";
 import { formatDuration } from "@/utils/track-helper";
 import { Link } from "react-router-dom";
+import { ITrack } from "@/features/track/types";
 
 interface TrackRowProps {
-  track: Track;
+  track: ITrack;
   index: number;
   isActive: boolean;
   isPlaying: boolean;
@@ -31,7 +31,7 @@ export const TrackRow = memo(
         className={cn(
           "group h-14 transition-colors",
           "hover:bg-white/5",
-          isActive && "bg-white/10"
+          isActive && "bg-white/10",
         )}
       >
         {/* ===== PLAY ZONE ===== */}
@@ -94,7 +94,7 @@ export const TrackRow = memo(
               <p
                 className={cn(
                   "truncate text-sm font-medium",
-                  isActive ? "text-primary" : "text-foreground"
+                  isActive ? "text-primary" : "text-foreground",
                 )}
               >
                 {track.title}
@@ -155,7 +155,7 @@ export const TrackRow = memo(
         </TableCell>
       </TableRow>
     );
-  }
+  },
 );
 
 TrackRow.displayName = "TrackRow";

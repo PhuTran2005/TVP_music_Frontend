@@ -1,7 +1,7 @@
 import { Album } from "@/features/album/types";
 import { Artist } from "@/features/artist/types";
 
-export interface Track {
+export interface ITrack {
   _id: string;
   title: string;
   slug: string;
@@ -56,6 +56,7 @@ export interface TrackFilterParams {
   genreId?: string;
   status?: "pending" | "processing" | "ready" | "failed";
   sort?: "newest" | "popular" | "alphabetical";
+  isPublic?: boolean;
 }
 
 // 1. Dữ liệu 1 điểm trên biểu đồ (Time Series)
@@ -67,19 +68,7 @@ export interface ChartDataPoint {
 }
 
 // 2. Cấu trúc bài hát trong BXH
-export interface ChartTrack {
-  _id: string;
-  title: string;
-  slug: string;
-  coverImage: string;
-  fileUrl: string;
-  artist: Artist;
-  score: number;
-  album?: Album;
-  featuringArtists: Artist[];
-  duration: number;
-
-  // Frontend only
+export interface ChartTrack extends ITrack {
   rank?: number;
   lastRank?: number;
 }

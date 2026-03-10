@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
   X,
   ShieldCheck,
-  ArrowUpDown,
-  RotateCcw,
   Globe,
   Music2,
   LayoutGrid,
-  Filter,
+  SlidersHorizontal,
+  ChevronDown,
+  Trash2,
+  UserCheck,
+  UserX,
+  ListFilter,
 } from "lucide-react";
 import { ArtistFilterParams } from "@/features/artist/types";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -20,6 +23,8 @@ import FilterDropdown from "@/components/ui/FilterDropdown";
 import { GenreSelector } from "@/features/genre/components/GenreSelector";
 import { NationalitySelector } from "@/components/ui/NationalitySelector";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 // Shadcn Select
 import {
@@ -32,106 +37,113 @@ import {
 
 interface ArtistFiltersProps {
   params: ArtistFilterParams;
-  setParams: React.Dispatch<React.SetStateAction<ArtistFilterParams>>;
+  // 🔥 UPDATE: Sử dụng callback thay vì setParams trực tiếp để nhất quán
+  onSearch: (keyword: string) => void;
+  onFilterChange: (key: keyof ArtistFilterParams, value: any) => void;
+  onReset: () => void;
 }
 
 const SORT_OPTIONS = [
-  { label: "Mới nhất", value: "newest" },
-  { label: "Phổ biến nhất", value: "popular" },
-  { label: "Lượt nghe tháng", value: "monthlyListeners" },
-  { label: "Tên A-Z", value: "name" },
+  { label: "Newest", value: "newest" },
+  { label: "Popular", value: "popular" },
+  { label: "Followers", value: "followers" },
+  { label: "A-Z", value: "name" },
 ] as const;
 
 export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
   params,
-  setParams,
+  onSearch,
+  onFilterChange,
+  onReset,
 }) => {
-  const [showFilters, setShowFilters] = useState(false);
-
-  // --- 1. Debounce Search Logic ---
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [overflowVisible, setOverflowVisible] = useState(false);
+  console.log("params in ArtistFilters:", params);
+  // --- 1. Search Logic ---
   const [localSearch, setLocalSearch] = useState(params.keyword || "");
-  const debouncedSearch = useDebounce(localSearch, 500);
+  const debouncedSearch = useDebounce(localSearch, 400);
 
   useEffect(() => {
-    if (debouncedSearch !== params.keyword) {
-      setParams((prev) => ({ ...prev, keyword: debouncedSearch, page: 1 }));
+    setLocalSearch(params.keyword || "");
+  }, [params.keyword]);
+
+  useEffect(() => {
+    if (debouncedSearch !== (params.keyword || "")) {
+      onSearch(debouncedSearch);
     }
-  }, [debouncedSearch, params.keyword, setParams]);
+  }, [debouncedSearch, params.keyword, onSearch]);
 
-  // Helper change params
-  const handleChange = useCallback(
-    (key: keyof ArtistFilterParams, value: any) => {
-      setParams((prev) => ({ ...prev, [key]: value, page: 1 }));
-    },
-    [setParams]
-  );
-
-  // --- 2. Reset Logic ---
-  const handleReset = () => {
+  const handleClearSearch = () => {
     setLocalSearch("");
-    setParams((prev) => ({
-      ...prev,
-      page: 1,
-      limit: prev.limit,
-      keyword: "",
-      sort: "newest",
-      genreId: undefined,
-      nationality: undefined,
-      isVerified: undefined,
-      isActive: undefined,
-    }));
   };
 
-  // Check xem có đang filter không
-  const hasFilter = useMemo(() => {
-    return !!(
-      params.keyword ||
-      params.genreId ||
-      params.nationality ||
-      params.isVerified !== undefined ||
-      params.isActive !== undefined ||
-      (params.sort && params.sort !== "newest")
-    );
+  // 🔥 Fix Overflow Animation
+  useEffect(() => {
+    if (isExpanded) {
+      const timer = setTimeout(() => setOverflowVisible(true), 300);
+      return () => clearTimeout(timer);
+    } else {
+      setOverflowVisible(false);
+    }
+  }, [isExpanded]);
+
+  // --- 2. Active Count ---
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (params.genreId) count++;
+    if (params.nationality) count++;
+    if (params.isVerified !== undefined) count++;
+    if (params.isActive !== undefined) count++;
+    return count;
   }, [params]);
 
+  const removeFilter = (key: keyof ArtistFilterParams) => {
+    onFilterChange(key, undefined);
+  };
+
   return (
-    <div className="w-full bg-card border border-border rounded-xl shadow-sm mb-8 transition-all hover:border-primary/20">
-      <div className="p-4 space-y-4">
-        {/* --- TOP ROW: Search & Actions --- */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-          {/* Search Bar */}
-          <div className="relative w-full max-w-md group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+    <div className="w-full mb-8">
+      {/* CONTAINER: Block Design */}
+      <div className="bg-card border border-border rounded-xl shadow-sm transition-all overflow-hidden">
+        {/* --- HEADER --- */}
+        <div className="p-4 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card">
+          {/* 1. Search Input */}
+          <div className="relative w-full md:flex-1 md:max-w-xl group">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <Search className="size-4" />
+            </div>
             <Input
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              placeholder="Tìm kiếm nghệ sĩ, nghệ danh..."
-              className="pl-9 bg-background h-10 text-sm border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium placeholder:font-normal"
+              placeholder="Search artists..."
+              className="pl-9 pr-9 h-10 bg-background border-input shadow-sm focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-all"
             />
             {localSearch && (
               <button
-                onClick={() => setLocalSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-all"
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="size-3.5" />
               </button>
             )}
           </div>
 
-          {/* Right Actions Group */}
-          <div className="flex items-center gap-3 self-end md:self-auto w-full md:w-auto justify-end">
-            {/* Sort Dropdown */}
+          {/* 2. Actions */}
+          <div className="flex items-center gap-3 w-full md:w-auto md:justify-end">
             <Select
               value={params.sort || "newest"}
-              onValueChange={(val) => handleChange("sort", val)}
+              onValueChange={(val) => onFilterChange("sort", val)}
             >
-              <SelectTrigger className="w-[160px] h-10 text-sm bg-background border-input shadow-sm font-medium">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-                  <SelectValue placeholder="Sắp xếp" />
+              <SelectTrigger className="h-10 w-full md:w-[160px] bg-background border-input shadow-sm hover:bg-accent/50 transition-colors">
+                <div className="flex items-center gap-2 truncate">
+                  <ListFilter className="size-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground text-xs uppercase tracking-wide font-semibold">
+                    Sort:
+                  </span>
+                  <SelectValue />
                 </div>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent align="end">
                 {SORT_OPTIONS.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
@@ -140,141 +152,260 @@ export const ArtistFilters: React.FC<ArtistFiltersProps> = ({
               </SelectContent>
             </Select>
 
-            <div className="h-6 w-px bg-border hidden md:block" />
+            <Separator orientation="vertical" className="h-6 hidden md:block" />
 
             <Button
-              variant={showFilters ? "secondary" : "outline"}
-              onClick={() => setShowFilters(!showFilters)}
+              variant={isExpanded ? "secondary" : "outline"}
+              onClick={() => setIsExpanded(!isExpanded)}
               className={cn(
-                "gap-2 h-10 px-4 font-bold border-input shadow-sm transition-all",
-                showFilters &&
-                  "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                "h-10 px-4 gap-2 shadow-sm border-input hover:bg-accent/50 transition-all min-w-[100px] justify-between",
+                isExpanded &&
+                  "bg-primary/10 text-primary border-primary/30 hover:bg-primary/15",
               )}
             >
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </Button>
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="size-3.5" />
+                <span className="font-medium hidden md:flex">Filter</span>
+              </div>
 
-            {hasFilter && (
-              <Button
-                variant="ghost"
-                onClick={handleReset}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive h-10 px-3 gap-2 font-bold animate-in zoom-in duration-200"
-              >
-                <RotateCcw className="size-4" />
-                Xóa
-              </Button>
-            )}
+              <div className="flex items-center gap-1">
+                {activeFiltersCount > 0 && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    {activeFiltersCount}
+                  </span>
+                )}
+                <ChevronDown
+                  className={cn(
+                    "size-3.5 text-muted-foreground transition-transform duration-200",
+                    isExpanded && "rotate-180",
+                  )}
+                />
+              </div>
+            </Button>
           </div>
         </div>
 
-        {/* --- BOTTOM ROW: Expanded Filters --- */}
-        {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border animate-in slide-in-from-top-2 duration-300">
-            {/* 1. Nationality Filter */}
-            <FilterDropdown
-              isActive={!!params.nationality}
-              onClear={() => handleChange("nationality", undefined)}
-              label={
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-blue-500" />
-                  <span className="truncate text-sm font-medium">
-                    {params.nationality
-                      ? `Quốc gia: ${params.nationality}`
-                      : "Quốc gia"}
-                  </span>
-                </div>
-              }
-              contentClassName="w-[280px]"
-            >
-              <div className="p-1">
-                <NationalitySelector
-                  autoDetect
-                  value={params.nationality}
-                  onChange={(val) => handleChange("nationality", val)}
-                />
+        {/* --- EXPANDABLE PANEL --- */}
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-300 ease-in-out border-t border-transparent",
+            isExpanded ? "grid-rows-[1fr] border-border" : "grid-rows-[0fr]",
+          )}
+        >
+          <div
+            className={cn(
+              "bg-muted/30 transition-all",
+              overflowVisible ? "overflow-visible" : "overflow-hidden",
+            )}
+          >
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Nationality */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                  <Globe className="size-3" /> Nationality
+                </label>
+                <FilterDropdown
+                  isActive={!!params.nationality}
+                  onClear={() => onFilterChange("nationality", undefined)}
+                  label={
+                    <span className="truncate">
+                      {params.nationality
+                        ? `Selected: ${params.nationality}`
+                        : "All Countries"}
+                    </span>
+                  }
+                  contentClassName="w-[280px]"
+                  className="w-full bg-background h-9 text-sm font-normal px-3 justify-start shadow-sm focus:ring-1"
+                >
+                  <div className="p-1">
+                    <NationalitySelector
+                      value={params.nationality}
+                      onChange={(val) => onFilterChange("nationality", val)}
+                      clearable={true}
+                      // autoDetect={false} (Mặc định là false rồi, không cần truyền)
+                    />
+                  </div>
+                </FilterDropdown>
               </div>
-            </FilterDropdown>
 
-            {/* 2. Genre Filter */}
-            <FilterDropdown
-              isActive={!!params.genreId}
-              onClear={() => handleChange("genreId", undefined)}
-              label={
-                <div className="flex items-center gap-2">
-                  <Music2 className="w-4 h-4 text-primary" />
-                  <span className="truncate text-sm font-medium">
-                    {params.genreId ? "Genre đã chọn" : "Thể loại nhạc"}
-                  </span>
-                </div>
-              }
-              contentClassName="w-[300px]"
-            >
-              <div className="p-1">
-                <GenreSelector
-                  singleSelect
-                  value={params.genreId ? [params.genreId] : []}
-                  onChange={(ids) => handleChange("genreId", ids[0])}
-                />
+              {/* 2. Genre */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                  <Music2 className="size-3" /> Genre
+                </label>
+                <FilterDropdown
+                  isActive={!!params.genreId}
+                  onClear={() => onFilterChange("genreId", undefined)}
+                  label={
+                    <span className="truncate">
+                      {params.genreId ? "Filtered" : "Select Genre"}
+                    </span>
+                  }
+                  contentClassName="w-[280px]"
+                  className="w-full bg-background h-9 text-sm font-normal px-3 justify-start shadow-sm focus:ring-1"
+                >
+                  <div className="p-1">
+                    <GenreSelector
+                      // 🔥 CẤU HÌNH CHO FILTER
+                      variant="filter"
+                      singleSelect={true}
+                      // 1. Value: Chuyển array thành string đơn (nếu params lưu string)
+                      value={params.genreId}
+                      // 2. OnChange: Nhận về string ID hoặc undefined
+                      onChange={(val) => {
+                        // val ở đây là một string ID (vd: "65a...") hoặc undefined
+                        onFilterChange("genreId", val);
+                      }}
+                      placeholder="Tìm kiếm thể loại..."
+                    />
+                  </div>
+                </FilterDropdown>
               </div>
-            </FilterDropdown>
 
-            {/* 3. Account Status */}
-            <Select
-              value={
-                params.isActive === undefined ? "all" : String(params.isActive)
-              }
-              onValueChange={(val) => {
-                const value = val === "all" ? undefined : val === "true";
-                handleChange("isActive", value);
-              }}
-            >
-              <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
-                <div className="flex items-center gap-2 text-sm">
-                  <LayoutGrid className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-foreground truncate font-medium">
-                    {params.isActive === undefined
-                      ? "Trạng thái: Tất cả"
-                      : params.isActive
-                      ? "Đang hoạt động"
-                      : "Bị khóa/Ẩn"}
-                  </span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="true">Đang hoạt động</SelectItem>
-                <SelectItem value="false">Bị khóa/Ẩn</SelectItem>
-              </SelectContent>
-            </Select>
+              {/* 3. Account Status */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                  <LayoutGrid className="size-3" /> Status
+                </label>
+                <Select
+                  value={
+                    params.isActive === undefined
+                      ? "all"
+                      : String(params.isActive)
+                  }
+                  onValueChange={(val) => {
+                    const value = val === "all" ? undefined : val === "true";
+                    onFilterChange("isActive", value);
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-background h-9 text-sm shadow-sm focus:ring-1">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="true">Active</SelectItem>
+                    <SelectItem value="false">Inactive/Banned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* 4. Verified Status */}
-            <Select
-              value={
-                params.isVerified === undefined
-                  ? "all"
-                  : String(params.isVerified)
-              }
-              onValueChange={(val) => {
-                const value = val === "all" ? undefined : val === "true";
-                handleChange("isVerified", value);
-              }}
+              {/* 4. Verification */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                  <ShieldCheck className="size-3" /> Verification
+                </label>
+                <Select
+                  value={
+                    params.isVerified === undefined
+                      ? "all"
+                      : String(params.isVerified)
+                  }
+                  onValueChange={(val) => {
+                    const value = val === "all" ? undefined : val === "true";
+                    onFilterChange("isVerified", value);
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-background h-9 text-sm shadow-sm focus:ring-1">
+                    <SelectValue placeholder="All Profiles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Profiles</SelectItem>
+                    <SelectItem value="true">Verified Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* --- ACTIVE TAGS --- */}
+        {activeFiltersCount > 0 && (
+          <div className="p-3 bg-muted/20 border-t border-border flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground mr-1">
+              Active:
+            </span>
+
+            {/* Tags */}
+            {params.nationality && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                <Globe className="size-3 text-blue-500" />
+                <span className="text-muted-foreground">Nation:</span>
+                <span className="font-medium">{params.nationality}</span>
+                <button
+                  onClick={() => removeFilter("nationality")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
+
+            {params.genreId && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                <Music2 className="size-3 text-pink-500" />
+                <span className="text-muted-foreground">Genre:</span>
+                <span className="font-medium">Selected</span>
+                <button
+                  onClick={() => removeFilter("genreId")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
+
+            {params.isVerified !== undefined && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                <ShieldCheck className="size-3 text-emerald-500" />
+                <span className="font-medium">Verified Only</span>
+                <button
+                  onClick={() => removeFilter("isVerified")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
+
+            {params.isActive !== undefined && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                {params.isActive ? (
+                  <UserCheck className="size-3 text-green-500" />
+                ) : (
+                  <UserX className="size-3 text-red-500" />
+                )}
+                <span className="font-medium">
+                  {params.isActive ? "Active" : "Inactive"}
+                </span>
+                <button
+                  onClick={() => removeFilter("isActive")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onReset}
+              className="h-7 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto font-medium"
             >
-              <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
-                <div className="flex items-center gap-2 text-sm">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span className="text-foreground truncate font-medium">
-                    {params.isVerified === undefined
-                      ? "Xác minh: Tất cả"
-                      : "Nghệ sĩ xác minh"}
-                  </span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả hồ sơ</SelectItem>
-                <SelectItem value="true">Đã xác minh (Verified)</SelectItem>
-              </SelectContent>
-            </Select>
+              <Trash2 className="size-3 mr-1.5" /> Clear All
+            </Button>
           </div>
         )}
       </div>

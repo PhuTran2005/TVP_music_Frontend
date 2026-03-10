@@ -11,10 +11,11 @@ import {
   MoveVertical,
   Settings2,
   X,
+  Music4,
+  GripVertical,
 } from "lucide-react";
-import { Track } from "@/features/track/types";
 
-// UI Components (Shadcn + Custom)
+// UI Components
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import MusicResult from "@/components/ui/Result";
 import { cn } from "@/lib/utils";
 
-// DND Kit
+// DND Kit (Drag and Drop)
 import {
   DndContext,
   closestCenter,
@@ -38,39 +39,42 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-// Hooks & Components
-import {
-  useAddTracksToPlaylist,
-  usePlaylistDetail,
-  useRemoveTrackFromPlaylist,
-} from "@/features/playlist/hooks/usePlaylist";
-import { usePlaylistAdmin } from "@/features/playlist/hooks/usePlaylistAdmin";
+// Hooks & Sub-components
+import { usePlaylistDetail } from "@/features/playlist/hooks/usePlaylistsQuery";
+import { usePlaylistMutations } from "@/features/playlist/hooks/usePlaylistMutations";
 import { SortablePlaylistTrackRow } from "@/features/playlist/components/SortablePlaylistTrackRow";
-import { useTrackAdmin } from "@/features/track/hooks/useTrackAdmin";
-import { TrackFilters } from "@/features/track/components/TrackFilters";
+import { ModalTrackFilter } from "@/features/track/components/ModalTrackFilter";
+import { ITrack, TrackFilterParams } from "@/features/track/types";
+import { usePublicTracks } from "@/features/track/hooks/useTracksQuery";
 
-/* ---------------- Skeleton Loader ---------------- */
+/* ---------------- Skeleton Loader Tinh Tế ---------------- */
 const TrackListSkeleton = () => (
-  <div className="space-y-2">
-    {[...Array(5)].map((_, i) => (
+  <div className="space-y-3">
+    {[...Array(6)].map((_, i) => (
       <div
         key={i}
-        className="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-muted/40 animate-pulse"
+        style={{ animationDelay: `${i * 100}ms` }}
+        className="flex items-center gap-4 p-3 rounded-xl bg-card border border-border/40 animate-pulse shadow-sm"
       >
-        <div className="size-10 rounded-md bg-muted" />
-        <div className="flex-1 space-y-2">
-          <div className="h-3 w-3/4 bg-muted rounded" />
-          <div className="h-2 w-1/2 bg-muted rounded" />
+        <div className="size-12 rounded-lg bg-muted/60 shrink-0" />
+        <div className="flex-1 space-y-2.5">
+          <div className="h-3.5 w-2/3 bg-muted/60 rounded-full" />
+          <div className="h-2.5 w-1/3 bg-muted/40 rounded-full" />
         </div>
+        <div className="size-8 rounded-full bg-muted/40 shrink-0" />
       </div>
     ))}
   </div>
 );
 
+/* -------------------------------------------------------------------------- */
+/* MAIN MODAL                                                                 */
+/* -------------------------------------------------------------------------- */
+
 interface EditPlaylistTracksModalProps {
   isOpen: boolean;
   onClose: () => void;
-  playlistId: string;
+  playlistId: string | undefined;
 }
 
 export const EditPlaylistTracksModal: React.FC<
@@ -79,43 +83,49 @@ export const EditPlaylistTracksModal: React.FC<
   const [activeTab, setActiveTab] = useState<"add" | "reorder" | "manage">(
     "add",
   );
-  const {
-    tracks: searchRes,
-    isLoading: isSearching,
-    filterParams,
-    setFilterParams,
-  } = useTrackAdmin(10);
-  // Search State
-  // --- API ---
-  const { data: playlistRes, isLoading: isLoadingPlaylist } =
-    usePlaylistDetail(playlistId);
-  const { reorderTracks, isReordering } = usePlaylistAdmin();
 
-  const addMutation = useAddTracksToPlaylist();
-  const removeMutation = useRemoveTrackFromPlaylist();
+  // 1. LOCAL STATE CHO BỘ LỌC TÌM KIẾM
+  const [trackParams, setTrackParams] = useState<TrackFilterParams>({
+    sort: "newest",
+  });
 
-  // --- Local State ---
-  const [orderedTracks, setOrderedTracks] = useState<Track[]>([]);
+  // 2. FETCH TRACKS DỰA TRÊN LOCAL STATE
+  const { data: searchRes, isLoading: isSearching } = usePublicTracks({
+    ...trackParams,
+    limit: 15,
+    isPublic: true,
+  });
+  const searchResults = searchRes?.tracks || [];
+
+  // --- 3. PLAYLIST DATA & MUTATIONS ---
+  const { data: playlist, isLoading: isLoadingPlaylist } = usePlaylistDetail(
+    playlistId || "",
+  );
+  const { addTracks, removeTrack, reorderTracks, isTrackMutating } =
+    usePlaylistMutations();
+
+  // --- Local State DND ---
+  const [orderedTracks, setOrderedTracks] = useState<ITrack[]>([]);
   const [isDirty, setIsDirty] = useState(false);
+  const [mutatingTrackId, setMutatingTrackId] = useState<string | null>(null);
 
   const currentTracks = useMemo(
-    () => playlistRes?.data?.tracks || [],
-    [playlistRes?.data?.tracks],
+    () => playlist?.tracks || [],
+    [playlist?.tracks],
   );
-  const searchResults = searchRes || [];
 
   useEffect(() => {
-    if (playlistRes?.data?.tracks && !isDirty) {
-      setOrderedTracks(playlistRes.data.tracks as Track[]);
+    if (playlist?.tracks && !isDirty) {
+      setOrderedTracks(playlist.tracks as ITrack[]);
     }
-  }, [playlistRes?.data?.tracks, isDirty]);
+  }, [playlist?.tracks, isDirty]);
 
   const existingTrackIds = useMemo(
-    () => new Set(currentTracks.map((t: Track) => t._id)),
+    () => new Set(currentTracks.map((t: ITrack) => t._id)),
     [currentTracks],
   );
 
-  // --- DND Logic ---
+  // --- 4. DND LOGIC ---
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
@@ -135,57 +145,60 @@ export const EditPlaylistTracksModal: React.FC<
     setIsDirty(true);
   };
 
+  // --- 5. ACTION HANDLERS ---
   const handleSaveOrder = () => {
-    if (!isDirty) return onClose();
-
+    if (!isDirty || !playlistId) return onClose();
     const trackIds = orderedTracks.map((t) => t._id);
 
-    // ✅ ĐÚNG: Truyền 3 tham số rời rạc
-    reorderTracks(
-      playlistId, // Tham số 1: ID
-      trackIds, // Tham số 2: Mảng ID
-      {
-        // Tham số 3: Options
-        onSuccess: () => {
-          setIsDirty(false);
-          onClose(); // Modal sẽ đóng sau khi API báo thành công
-        },
-      },
-    );
+    reorderTracks(playlistId, trackIds);
+    setIsDirty(false);
+    onClose();
   };
 
-  const handleAction = (id: string, type: "add" | "remove") => {
-    if (type === "add") {
-      addMutation.mutate({ playlistId, trackIds: [id] });
-    } else {
-      removeMutation.mutate({ playlistId, trackIds: [id] });
-    }
+  const handleAddTrack = (trackId: string) => {
+    if (!playlistId) return;
+    setMutatingTrackId(trackId);
+    addTracks(playlistId, [trackId]);
+    setTimeout(() => setMutatingTrackId(null), 800);
   };
+
+  const handleRemoveTrack = (trackId: string) => {
+    if (!playlistId) return;
+    setMutatingTrackId(trackId);
+    removeTrack(playlistId, trackId);
+    setTimeout(() => setMutatingTrackId(null), 800);
+  };
+
+  // Khóa cuộn trang khi mở modal
+  useEffect(() => {
+    if (isOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "unset";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6">
+      {/* --- Backdrop --- */}
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300" />
 
-      {/* Modal Container */}
-      <div className="relative z-[101] w-full max-w-4xl bg-background border border-border shadow-2xl flex flex-col h-[85vh] sm:h-[90vh] rounded-2xl animate-in zoom-in-95 duration-200 ring-1 ring-white/10 overflow-hidden">
-        {/* --- HEADER --- */}
-        <div className="shrink-0 px-6 py-4 border-b border-border flex justify-between items-center bg-background">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary shadow-sm">
-              <ListMusic className="size-5" />
+      {/* --- Modal Container --- */}
+      <div className="relative z-[101] w-full max-w-3xl bg-background border border-border/50 shadow-2xl flex flex-col h-[100vh] sm:h-[85vh] rounded-t-3xl sm:rounded-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 overflow-hidden">
+        {/* --- HEADER (Có hiệu ứng kính) --- */}
+        <div className="shrink-0 px-6 sm:px-8 py-5 border-b border-border/50 flex justify-between items-center bg-background/95 backdrop-blur-md z-10">
+          <div className="flex items-center gap-4">
+            <div className="size-12 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 text-primary shadow-sm shrink-0">
+              <ListMusic className="size-6" />
             </div>
-            <div>
-              <h3 className="font-bold text-lg text-foreground leading-none">
-                Manage Tracks
+            <div className="min-w-0">
+              <h3 className="font-bold text-lg sm:text-xl text-foreground tracking-tight truncate">
+                Quản lý Bài hát
               </h3>
-              <p className="text-xs text-muted-foreground mt-1 font-medium truncate max-w-[200px] sm:max-w-md">
-                {playlistRes?.data?.title || "Loading Playlist..."}
+              <p className="text-[13px] text-muted-foreground mt-0.5 font-medium truncate max-w-[200px] sm:max-w-[400px]">
+                {playlist?.title || "Đang tải playlist..."}
               </p>
             </div>
           </div>
@@ -193,106 +206,107 @@ export const EditPlaylistTracksModal: React.FC<
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="rounded-full h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors"
+            className="rounded-full size-9 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
           >
             <X className="size-5" />
           </Button>
         </div>
 
-        {/* --- TABS & SEARCH --- */}
-        <div className="shrink-0 p-2 border-b border-border bg-muted/5 space-y-3">
+        {/* --- TABS & FILTERS --- */}
+        <div className="shrink-0 px-6 sm:px-8 pt-5 pb-4 border-b border-border/40 bg-card z-10 space-y-4 shadow-sm">
           <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as any)}
             className="w-full"
           >
-            <TabsList className="w-full h-10 bg-muted/50 p-1 grid grid-cols-3 gap-1 rounded-lg border border-border/40">
+            <TabsList className="w-full h-11 bg-muted/50 p-1 grid grid-cols-3 gap-1 rounded-xl">
               {[
-                { val: "add", icon: Plus, label: "Add Tracks" },
-                { val: "reorder", icon: MoveVertical, label: "Reorder" },
+                { val: "add", icon: Plus, label: "Thêm Nhạc" },
+                { val: "reorder", icon: MoveVertical, label: "Sắp xếp" },
                 {
                   val: "manage",
                   icon: Settings2,
-                  label: `Manage (${currentTracks.length})`,
+                  label: `Đã Lưu (${currentTracks.length})`,
                 },
               ].map((item) => (
                 <TabsTrigger
                   key={item.val}
                   value={item.val}
-                  className="text-[10px] sm:text-xs font-bold uppercase gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-md transition-all"
+                  className="text-[11px] sm:text-xs font-bold uppercase tracking-widest gap-2 h-full data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm rounded-lg transition-all text-muted-foreground"
                 >
                   <item.icon className="size-3.5" />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate hidden xs:inline-block">
+                    {item.label}
+                  </span>
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
 
-          {/* Search Bar (Chỉ hiện ở Tab Add) */}
+          {/* Bộ lọc nội bộ */}
           {activeTab === "add" && (
-            <div className="relative animate-in fade-in slide-in-from-top-1 duration-200">
-              <TrackFilters
-                params={filterParams}
-                setParams={setFilterParams}
-                className="mb-0"
+            <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
+              <ModalTrackFilter
+                params={trackParams}
+                onChange={setTrackParams}
               />
             </div>
           )}
         </div>
 
-        {/* --- MAIN CONTENT (SCROLLABLE) --- */}
-        <div className="flex-1 overflow-hidden bg-background relative flex flex-col">
-          {/* TAB 1: ADD TRACKS */}
+        {/* --- MAIN CONTENT (Khu vực cuộn có nền tách biệt) --- */}
+        <div className="flex-1 overflow-hidden relative flex flex-col bg-muted/20">
+          {/* ================= TAB 1: ADD TRACKS ================= */}
           {activeTab === "add" && (
             <ScrollArea className="flex-1 h-full">
-              <div className="p-4 sm:p-6 space-y-2 pb-24">
+              <div className="p-4 sm:p-6 space-y-3 pb-24">
                 {isSearching ? (
                   <TrackListSkeleton />
                 ) : searchResults.length === 0 ? (
                   <MusicResult
                     status="empty"
-                    title="No tracks found"
-                    description="Try searching for something else."
+                    title="Không tìm thấy bài hát"
+                    description="Thử tìm kiếm với tên ca sĩ hoặc bài hát khác nhé."
                   />
                 ) : (
-                  searchResults.map((track: Track) => {
+                  searchResults.map((track: ITrack, index: number) => {
                     const isAdded = existingTrackIds.has(track._id);
-                    const isPending =
-                      addMutation.isPending &&
-                      addMutation.variables?.trackIds.includes(track._id);
+                    const isMutatingThis =
+                      mutatingTrackId === track._id && isTrackMutating;
 
                     return (
                       <div
                         key={track._id}
+                        style={{ animationDelay: `${index * 30}ms` }}
                         className={cn(
-                          "flex items-center justify-between p-2 rounded-xl border transition-all duration-200 select-none group",
+                          "flex items-center justify-between p-3 rounded-xl border transition-all duration-200 group animate-in fade-in slide-in-from-bottom-2",
                           isAdded
                             ? "bg-emerald-500/5 border-emerald-500/20"
-                            : "bg-card border-transparent hover:border-border hover:bg-muted/30",
+                            : "bg-card border-border/40 hover:border-primary/30 hover:shadow-md",
                         )}
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                          <Avatar className="size-10 rounded-lg shrink-0 border border-border/50">
+                        <div className="flex items-center gap-4 min-w-0 flex-1 mr-4">
+                          <Avatar className="size-12 rounded-lg shrink-0 shadow-sm border border-border/50 group-hover:scale-105 transition-transform">
                             <AvatarImage
                               src={track.coverImage}
                               className="object-cover"
                             />
-                            <AvatarFallback className="bg-muted">
-                              <Disc className="size-4 opacity-30" />
+                            <AvatarFallback className="bg-muted text-muted-foreground/50">
+                              <Disc className="size-5" />
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
                             <h4
                               className={cn(
-                                "text-sm font-bold truncate",
+                                "text-[14px] font-bold truncate transition-colors",
                                 isAdded
-                                  ? "text-emerald-700 dark:text-emerald-400"
-                                  : "text-foreground",
+                                  ? "text-emerald-600 dark:text-emerald-500"
+                                  : "text-foreground group-hover:text-primary",
                               )}
                             >
                               {track.title}
                             </h4>
-                            <p className="text-xs text-muted-foreground truncate font-medium">
+                            <p className="text-xs text-muted-foreground truncate font-medium mt-0.5">
                               {track.artist?.name}
                             </p>
                           </div>
@@ -301,21 +315,23 @@ export const EditPlaylistTracksModal: React.FC<
                         <Button
                           size={isAdded ? "sm" : "icon"}
                           variant={isAdded ? "ghost" : "secondary"}
-                          disabled={isAdded || isPending}
-                          onClick={() => handleAction(track._id, "add")}
+                          disabled={
+                            isAdded || isMutatingThis || isTrackMutating
+                          }
+                          onClick={() => handleAddTrack(track._id)}
                           className={cn(
-                            "shrink-0 transition-all rounded-full h-8 w-8 sm:w-auto sm:px-3",
+                            "shrink-0 transition-all rounded-full sm:w-auto h-9",
                             isAdded
-                              ? "text-emerald-600 bg-emerald-100/50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 cursor-default border-transparent"
-                              : "shadow-sm hover:bg-primary hover:text-primary-foreground border-transparent",
+                              ? "text-emerald-600 bg-transparent hover:bg-transparent cursor-default border-transparent px-3"
+                              : "w-9 bg-background border border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary shadow-sm hover:scale-105 active:scale-95",
                           )}
                         >
-                          {isPending ? (
-                            <Loader2 className="size-3.5 animate-spin" />
+                          {isMutatingThis ? (
+                            <Loader2 className="size-4 animate-spin" />
                           ) : isAdded ? (
-                            <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase">
-                              <CheckCircle2 className="size-3.5" />{" "}
-                              <span className="hidden sm:inline">Added</span>
+                            <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide">
+                              <CheckCircle2 className="size-4" />
+                              <span className="hidden sm:inline">Đã thêm</span>
                             </span>
                           ) : (
                             <Plus className="size-4" />
@@ -329,24 +345,26 @@ export const EditPlaylistTracksModal: React.FC<
             </ScrollArea>
           )}
 
-          {/* TAB 2: REORDER */}
+          {/* ================= TAB 2: REORDER ================= */}
           {activeTab === "reorder" && (
-            <ScrollArea className="flex-1 h-full bg-muted/5">
-              <div className="p-4 sm:p-6 space-y-2 pb-24">
+            <ScrollArea className="flex-1 h-full">
+              <div className="p-4 sm:p-6 space-y-3 pb-24">
                 {isLoadingPlaylist ? (
                   <TrackListSkeleton />
                 ) : orderedTracks.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-4">
-                    <div className="p-4 bg-background rounded-full border border-dashed border-border">
-                      <ListMusic className="size-8 opacity-20" />
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-4 animate-in fade-in">
+                    <div className="p-6 bg-card rounded-full border border-dashed border-border shadow-sm">
+                      <Music4 className="size-10 opacity-30" />
                     </div>
-                    <p className="text-sm font-medium">Playlist is empty</p>
+                    <p className="text-sm font-bold uppercase tracking-widest">
+                      Playlist đang trống
+                    </p>
                     <Button
                       variant="link"
                       onClick={() => setActiveTab("add")}
-                      className="text-primary h-auto p-0"
+                      className="text-primary font-bold"
                     >
-                      Add tracks now
+                      Thêm nhạc ngay
                     </Button>
                   </div>
                 ) : (
@@ -359,7 +377,7 @@ export const EditPlaylistTracksModal: React.FC<
                       items={orderedTracks.map((t) => t._id)}
                       strategy={verticalListSortingStrategy}
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {orderedTracks.map((track, index) => (
                           <SortablePlaylistTrackRow
                             key={track._id}
@@ -377,40 +395,45 @@ export const EditPlaylistTracksModal: React.FC<
             </ScrollArea>
           )}
 
-          {/* TAB 3: MANAGE */}
+          {/* ================= TAB 3: MANAGE ================= */}
           {activeTab === "manage" && (
             <ScrollArea className="flex-1 h-full">
-              <div className="p-4 sm:p-6 space-y-2 pb-24">
+              <div className="p-4 sm:p-6 space-y-3 pb-24">
                 {currentTracks.length === 0 ? (
-                  <MusicResult status="empty" title="No tracks" />
+                  <MusicResult
+                    status="empty"
+                    title="Chưa có bài hát"
+                    description="Chuyển sang tab Thêm Nhạc để tìm bài hát nhé."
+                  />
                 ) : (
-                  currentTracks.map((track: Track, i: number) => {
-                    const isPending =
-                      removeMutation.isPending &&
-                      removeMutation.variables?.trackIds.includes(track._id);
+                  currentTracks.map((track: ITrack, i: number) => {
+                    const isMutatingThis =
+                      mutatingTrackId === track._id && isTrackMutating;
+
                     return (
                       <div
                         key={track._id}
-                        className="flex items-center justify-between p-2 rounded-xl border border-border/40 bg-card hover:bg-destructive/5 hover:border-destructive/20 transition-all group"
+                        style={{ animationDelay: `${i * 30}ms` }}
+                        className="flex items-center justify-between p-3 rounded-xl border border-border/40 bg-card hover:border-destructive/30 transition-all duration-200 group shadow-sm animate-in fade-in slide-in-from-bottom-2"
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                          <span className="w-5 text-center text-[10px] font-mono font-bold text-muted-foreground/40">
+                        <div className="flex items-center gap-4 min-w-0 flex-1 mr-4">
+                          <span className="w-6 text-center text-xs font-mono font-bold text-muted-foreground/50">
                             {i + 1}
                           </span>
-                          <Avatar className="size-10 rounded-lg shrink-0 border border-border/50">
+                          <Avatar className="size-12 rounded-lg shrink-0 border border-border/50 shadow-sm group-hover:scale-105 transition-transform">
                             <AvatarImage
                               src={track.coverImage}
                               className="object-cover"
                             />
                             <AvatarFallback className="bg-muted">
-                              <Disc className="size-4 opacity-30" />
+                              <Disc className="size-5 opacity-30" />
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
-                            <h4 className="text-sm font-bold truncate text-foreground group-hover:text-destructive transition-colors">
+                            <h4 className="text-[14px] font-bold truncate text-foreground transition-colors">
                               {track.title}
                             </h4>
-                            <p className="text-xs text-muted-foreground truncate font-medium">
+                            <p className="text-xs text-muted-foreground truncate font-medium mt-0.5">
                               {track.artist?.name}
                             </p>
                           </div>
@@ -418,12 +441,12 @@ export const EditPlaylistTracksModal: React.FC<
                         <Button
                           size="icon"
                           variant="ghost"
-                          disabled={isPending}
-                          onClick={() => handleAction(track._id, "remove")}
-                          className="size-8 rounded-full text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          disabled={isMutatingThis || isTrackMutating}
+                          onClick={() => handleRemoveTrack(track._id)}
+                          className="size-9 rounded-full text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all active:scale-90"
                         >
-                          {isPending ? (
-                            <Loader2 className="size-4 animate-spin" />
+                          {isMutatingThis ? (
+                            <Loader2 className="size-4 animate-spin text-destructive" />
                           ) : (
                             <Trash2 className="size-4" />
                           )}
@@ -438,35 +461,35 @@ export const EditPlaylistTracksModal: React.FC<
         </div>
 
         {/* --- FOOTER --- */}
-        <div className="shrink-0 px-6 py-4 border-t border-border bg-background flex justify-between items-center z-20">
-          <p className="hidden sm:block text-[10px] text-muted-foreground font-medium italic">
+        <div className="shrink-0 px-6 sm:px-8 py-4 border-t border-border/50 bg-background/95 backdrop-blur-md flex justify-between items-center z-20">
+          <p className="hidden sm:block text-[11px] text-muted-foreground font-medium">
             {activeTab === "reorder"
-              ? "* Drag items to reorder. Click Save to apply."
-              : "* Changes are saved automatically."}
+              ? "Kéo thả để sắp xếp. Nhớ nhấn Lưu sau khi hoàn tất."
+              : "Thay đổi sẽ được lưu và đồng bộ tự động."}
           </p>
           <div className="flex gap-3 w-full sm:w-auto justify-end">
             <Button
               onClick={onClose}
               variant="ghost"
-              disabled={isReordering}
-              className="font-semibold text-muted-foreground hover:text-foreground"
+              disabled={isTrackMutating}
+              className="font-semibold text-muted-foreground hover:text-foreground h-10 px-5 rounded-lg transition-colors"
             >
-              Close
+              Đóng
             </Button>
 
-            {/* Save Button (Chỉ hiện khi Reorder + Dirty) */}
+            {/* Nút Save (Chỉ hiện khi đổi thứ tự) */}
             {activeTab === "reorder" && isDirty && (
               <Button
                 onClick={handleSaveOrder}
-                disabled={isReordering}
-                className="px-6 font-bold text-xs uppercase shadow-md hover:shadow-lg transition-all bg-primary text-primary-foreground animate-in zoom-in duration-200"
+                disabled={isTrackMutating}
+                className="h-10 px-6 font-bold text-[13px] shadow-md hover:shadow-lg transition-all animate-in zoom-in duration-300 rounded-lg"
               >
-                {isReordering ? (
-                  <Loader2 className="mr-2 size-3.5 animate-spin" />
+                {isTrackMutating ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                 ) : (
-                  <Save className="mr-2 size-3.5" />
+                  <Save className="mr-2 size-4" />
                 )}
-                Save Order
+                Lưu Thứ Tự
               </Button>
             )}
           </div>

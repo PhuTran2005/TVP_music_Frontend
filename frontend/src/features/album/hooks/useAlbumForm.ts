@@ -16,36 +16,40 @@ export const useAlbumForm = ({ albumToEdit, onSubmit }: UseAlbumFormProps) => {
     return mapEntityToForm(albumToEdit);
   }, [albumToEdit]);
 
-  // 2. Init Form
+  // 1. Init Form
   const form = useForm<AlbumFormValues>({
     resolver: zodResolver(albumSchema),
     defaultValues,
-    mode: "onSubmit",
+    mode: "onSubmit", // Chỉ validate khi user ấn submit
   });
 
+  // 2. Reset form khi data đầu vào thay đổi (Dùng khi mở Modal Edit)
   useEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form]);
 
-  // 4. Custom Submit Handler
+  // 3. Custom Submit Handler
   const handleSubmit = form.handleSubmit(async (values) => {
     const { dirtyFields } = form.formState;
     const isEditMode = !!albumToEdit;
 
-    // TỐI ƯU BĂNG THÔNG:
-    // Nếu đang Edit mà không sửa gì cả (và không up ảnh mới) -> Return luôn
     const hasFile = values.coverImage instanceof File;
     const hasChanges = Object.keys(dirtyFields).length > 0;
 
+    // TỐI ƯU BĂNG THÔNG
     if (isEditMode && !hasChanges && !hasFile) {
-      console.log("⚠️ No changes detected, skipping API call.");
+      console.log("⚠️ Không có thay đổi nào, bỏ qua gọi API.");
+      // Tùy chọn: Gọi 1 hàm onClose() ở đây nếu muốn tự đóng modal
       return;
     }
 
-    // Build Payload thông minh (chỉ chứa data thay đổi)
-    const payload = buildAlbumPayload(values, dirtyFields, isEditMode);
+    console.log("Dirty fields (Các trường đã sửa):", dirtyFields);
 
-    
+    // Build Payload
+    const payload = buildAlbumPayload(values, dirtyFields, isEditMode);
+    console.log("🚀 Submitting Album Payload:", payload);
+
+    // MỞ COMMENT DÒNG NÀY ĐỂ GỌI API
     await onSubmit(payload);
   });
 

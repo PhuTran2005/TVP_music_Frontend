@@ -82,6 +82,6 @@ export interface AlbumFilterParams {
   genreId?: string;
   year?: number;
   type?: "album" | "single" | "ep" | "compilation" | "all";
-  sort?: "newest" | "oldest" | "popular" | "a-z"; // Thêm sort
+  sort?: "newest" | "oldest" | "popular" | "name"; // Thêm sort
   isPublic?: boolean; // Admin có thể lọc theo trạng thái
 }

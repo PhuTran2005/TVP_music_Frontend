@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import Avatar, { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import logo from "../../../../public/LOGO.png";
 
 export function Footer() {
   return (
@@ -26,7 +25,7 @@ export function Footer() {
               <div className="relative flex items-center justify-center size-12 rounded-xl bg-primary/10 border border-primary/20 shadow-sm transition-transform group-hover:scale-105">
                 <Avatar className="size-full rounded-xl">
                   <AvatarImage
-                    src={logo}
+                    src="https://res.cloudinary.com/dc5rfjnn5/image/upload/v1770807338/LOGO_o4n02n.png"
                     alt="Logo"
                     className="object-cover p-1.5"
                   />

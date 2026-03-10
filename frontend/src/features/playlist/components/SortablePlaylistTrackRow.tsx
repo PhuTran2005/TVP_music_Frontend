@@ -1,23 +1,20 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Trash2, Disc } from "lucide-react";
+import { GripVertical, Disc } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Track } from "@/features/track/types";
 
 interface SortablePlaylistTrackRowProps {
   track: Track;
   index: number;
-  onRemove: (id: string) => void;
-  isRemoving: boolean;
+  onRemove?: (id: string) => void;
+  isRemoving?: boolean;
 }
 
 export const SortablePlaylistTrackRow = ({
   track,
   index,
-  onRemove,
-  isRemoving,
 }: SortablePlaylistTrackRowProps) => {
   const {
     attributes,
@@ -32,7 +29,7 @@ export const SortablePlaylistTrackRow = ({
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 50 : "auto",
-    position: "relative" as const, // Đảm bảo z-index hoạt động đúng
+    position: "relative" as const,
   };
 
   return (
@@ -40,51 +37,78 @@ export const SortablePlaylistTrackRow = ({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center justify-between p-2 sm:p-3 rounded-xl border mb-2 transition-all duration-200 touch-none select-none",
+        // Base styles: Cấu trúc hộp, transition mượt mà
+        "group flex items-center p-2 sm:p-2.5 rounded-xl border mb-2.5 transition-all duration-200 select-none",
+        // State: Đang được kéo (Dragging) -> Nổi khối lên, có viền primary, đổ bóng to
         isDragging
-          ? "bg-primary/5 border-primary shadow-xl scale-[1.02] z-50 cursor-grabbing"
-          : "bg-card border-border/60 hover:border-primary/30 hover:shadow-sm hover:bg-accent/20"
+          ? "bg-background border-primary shadow-xl ring-1 ring-primary/20 scale-[1.02] opacity-95 z-50"
+          : "bg-card border-border/50 hover:border-primary/40 hover:shadow-md hover:bg-muted/30",
       )}
     >
-      <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-        {/* --- DRAG HANDLE --- */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-2 text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded-lg transition-colors touch-none"
-          title="Kéo để sắp xếp"
-        >
-          <GripVertical className="size-5" />
+      {/* --- DRAG HANDLE (Điểm cầm nắm) --- */}
+      {/* Hitbox lớn hơn, icon mờ khi bình thường, rõ lên khi hover/drag */}
+      <div
+        {...attributes}
+        {...listeners}
+        className={cn(
+          "flex items-center justify-center p-2.5 mr-1 sm:mr-2 rounded-lg transition-colors touch-none outline-none",
+          isDragging
+            ? "text-primary cursor-grabbing"
+            : "text-muted-foreground/40 hover:text-foreground hover:bg-muted cursor-grab",
+        )}
+        title="Nhấn giữ và kéo để sắp xếp"
+      >
+        <GripVertical className="size-5" />
+      </div>
+
+      {/* --- THÔNG TIN BÀI HÁT --- */}
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 pr-4">
+        {/* Index: Căn giữa, font monospace để số 1 và số 0 thẳng hàng */}
+        <div className="w-5 text-center hidden xs:block shrink-0">
+          <span
+            className={cn(
+              "text-[13px] font-mono font-bold transition-colors",
+              isDragging ? "text-primary" : "text-muted-foreground/50",
+            )}
+          >
+            {(index + 1).toString().padStart(2, "0")}
+          </span>
         </div>
 
-        {/* Index: Ẩn trên mobile rất nhỏ, hiện trên mobile thường */}
-        <span className="w-6 text-xs font-mono font-bold text-muted-foreground/70 shrink-0 text-center hidden xs:block">
-          {(index + 1).toString().padStart(2, "0")}
-        </span>
-
-        {/* Avatar */}
-        <Avatar className="size-10 sm:size-11 rounded-lg shrink-0 border border-border shadow-sm">
+        {/* Cover Image */}
+        <Avatar
+          className={cn(
+            "size-10 sm:size-12 rounded-lg shrink-0 border border-border/60 transition-transform",
+            isDragging ? "shadow-md" : "shadow-sm group-hover:scale-105",
+          )}
+        >
           <AvatarImage src={track.coverImage} className="object-cover" />
           <AvatarFallback className="bg-muted">
-            <Disc className="size-5 opacity-30 animate-pulse" />
+            <Disc className="size-5 opacity-30 animate-pulse text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
 
-        {/* Info */}
-        <div className="flex flex-col min-w-0 gap-0.5">
+        {/* Text Info */}
+        <div className="flex flex-col min-w-0 gap-0.5 flex-1">
           <h4
             className={cn(
-              "text-sm font-bold truncate leading-tight text-foreground",
-              isDragging && "text-primary"
+              "text-[14px] font-bold truncate leading-tight transition-colors",
+              isDragging
+                ? "text-primary"
+                : "text-foreground group-hover:text-primary",
             )}
           >
             {track.title}
           </h4>
-          <p className="text-xs text-muted-foreground font-medium truncate">
+          <p className="text-[12px] text-muted-foreground font-medium truncate">
             {track.artist?.name || "Unknown Artist"}
           </p>
         </div>
       </div>
+
+      {/* Lưu ý: Component này chuyên dùng cho Tab Sắp Xếp (Reorder), 
+          việc loại bỏ Nút Thùng Rác (Trash) ở đây là CHUẨN UX để tránh 
+          người dùng lỡ tay bấm nhầm xóa bài hát khi đang cố kéo thả. */}
     </div>
   );
 };

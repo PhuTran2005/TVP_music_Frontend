@@ -1,4 +1,3 @@
-import { AlbumFilterParams } from "@/features/album/types";
 import { PlaylistFilterParams } from "@/features/playlist/types";
 
 // features/playlist/utils/playlistKeys.ts

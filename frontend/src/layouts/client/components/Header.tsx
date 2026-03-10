@@ -4,7 +4,6 @@ import {
   Menu,
   X,
   Home,
-  Music,
   Users,
   Disc3,
   ListMusic,
@@ -26,7 +25,6 @@ import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/mode-toggle";
 import UserDropdown from "@/features/user/components/UserDropdown";
 import Avatar, { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import logo from "../../../../public/LOGO.png";
 import { useAppSelector } from "@/store/hooks";
 
 export function Header() {
@@ -108,7 +106,7 @@ export function Header() {
               <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-tr from-primary/20 to-primary/10 border border-primary/20 shadow-sm transition-transform duration-300 group-hover:scale-105 group-hover:shadow-primary/30">
                 <Avatar className="size-full rounded-xl">
                   <AvatarImage
-                    src={logo}
+                    src="https://res.cloudinary.com/dc5rfjnn5/image/upload/v1770807338/LOGO_o4n02n.png"
                     alt="Logo"
                     className="object-cover p-1" // Padding nhẹ để logo không bị sát viền
                   />
@@ -131,7 +129,7 @@ export function Header() {
                       "relative px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       isActive
                         ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                        : "text-muted-foreground hover:text-foreground hover:bg-background/50",
                     )}
                   >
                     {isActive && (
@@ -284,13 +282,13 @@ export function Header() {
                           "flex items-center gap-4 px-4 py-4 rounded-xl transition-all text-lg font-medium",
                           isActive
                             ? "bg-primary/10 text-primary font-bold shadow-sm border border-primary/20"
-                            : "text-foreground/80 hover:bg-muted hover:text-foreground"
+                            : "text-foreground/80 hover:bg-muted hover:text-foreground",
                         )}
                       >
                         <item.icon
                           className={cn(
                             "size-6",
-                            isActive ? "fill-primary/20" : ""
+                            isActive ? "fill-primary/20" : "",
                           )}
                         />
                         {item.label}

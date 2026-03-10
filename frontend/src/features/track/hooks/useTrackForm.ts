@@ -1,174 +1,157 @@
-import { useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { type Track } from "../types";
-import {
-  trackSchema,
-  type TrackFormValues,
-} from "@/features/track/schemas/track.schema";
-import { formatDate } from "@/utils/track-helper";
 
-export const useTrackForm = (
-  trackToEdit: Track | null | undefined,
-  isOpen: boolean
-) => {
-  // 1. Init Form
+import { trackSchema, type TrackFormValues } from "../schemas/track.schema";
+import { mapTrackToForm } from "../utils/formMapper";
+import { buildTrackPayload } from "../utils/payloadBuilder";
+import { ITrack } from "@/features/track/types";
+
+interface UseTrackFormProps {
+  trackToEdit?: ITrack | null;
+  onSubmit: (formData: FormData) => Promise<void>; // Inject hàm gọi API từ hook mutation
+}
+
+export const useTrackForm = ({ trackToEdit, onSubmit }: UseTrackFormProps) => {
+  // 1. Map Entity -> Form Values (Chỉ chạy lại khi trackToEdit đổi)
+  const defaultValues = useMemo(() => {
+    return mapTrackToForm(trackToEdit);
+  }, [trackToEdit]);
+
+  // 2. Init Form
   const form = useForm<TrackFormValues>({
     resolver: zodResolver(trackSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      isPublic: false,
-      artistId: "",
-      // 🔥 Thêm giá trị mặc định cho Feat Artists
-      featuringArtistIds: [],
-      albumId: "",
-      genreIds: [],
-      duration: 0,
-      audio: null,
-      trackNumber: 0,
-      diskNumber: 0,
-      copyright: "",
-      coverImage: null,
-      lyrics: "",
-    },
+    defaultValues,
+    mode: "onSubmit", // Validate khi submit
   });
 
-  const { reset, setValue, watch } = form;
+  const { reset, watch, setValue, formState } = form;
+  const { dirtyFields, isSubmitting } = formState;
 
-  // 2. Local State for Previews
-  const [audioName, setAudioName] = useState<string>("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  // Watch values for UI
-  const duration = watch("duration");
-  const isPublic = watch("isPublic");
-  const coverValue = watch("coverImage");
-
-  // 3. Reset Form Effect
+  // 3. Reset form khi data thay đổi (quan trọng cho Modal)
   useEffect(() => {
-    if (isOpen) {
-      if (trackToEdit) {
-        // --- EDIT MODE ---
-        // Helper safely get ID
-        const getId = (obj: any) =>
-          obj && typeof obj === "object" && "_id" in obj ? obj._id : obj || "";
+    reset(defaultValues);
+  }, [defaultValues, reset]);
 
-        // Helper safely get array IDs
-        const getIds = (arr: any[]) =>
-          Array.isArray(arr)
-            ? arr.map((item) => getId(item)).filter(Boolean)
-            : [];
+  // --- PREVIEW LOGIC ---
+  const coverValue = watch("coverImage");
+  const audioValue = watch("audio");
 
-        reset({
-          title: trackToEdit.title || "",
-          description: trackToEdit.description || "",
-          isPublic: trackToEdit.isPublic ?? true, // Fallback true
-          isExplicit: trackToEdit.isExplicit ?? false,
-          isrc: trackToEdit.isrc || "",
-          copyright: trackToEdit.copyright || "",
-          lyrics: trackToEdit.lyrics || "",
-          tags: Array.isArray(trackToEdit.tags) ? trackToEdit.tags : [],
-          trackNumber: trackToEdit.trackNumber || 0,
-          diskNumber: trackToEdit.diskNumber || 0,
-          artistId: getId(trackToEdit.artist),
-          featuringArtistIds: getIds(trackToEdit.featuringArtists), // 🔥 Fix map feat
-          albumId: getId(trackToEdit.album),
-          genreIds: getIds(trackToEdit.genres),
-          releaseDate: formatDate(trackToEdit.releaseDate),
-          duration: trackToEdit.duration || 0,
-          coverImage: trackToEdit.coverImage,
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [audioPreview, setAudioPreview] = useState<string | null>(null); // Để hiện tên file hoặc player
 
-          // 🔥 Quan trọng: Audio luôn null khi edit (trừ khi user chọn file mới)
-          audio: null,
-        });
-        setImagePreview(trackToEdit.coverImage || null);
-        setAudioName(trackToEdit.trackUrl ? "Audio File Exists" : "");
-      } else {
-        // --- MODE: CREATE ---
-        reset({
-          title: "",
-          description: "",
-          isPublic: true,
-          artistId: "",
-          featuringArtistIds: [], // Reset feat
-          albumId: "",
-          genreIds: [],
-          duration: 0,
-          isExplicit: false,
-          lyrics: "",
-          trackNumber: 0,
-          diskNumber: 0,
-          copyright: "",
-          isrc: "",
-          audio: null,
-          coverImage: null,
-          releaseDate: new Date().toISOString().split("T")[0],
-        });
-        setImagePreview(null);
-        setAudioName("");
-      }
-    }
-  }, [isOpen, trackToEdit, reset]);
-
-  // 4. Image Preview Logic
+  // Auto generate/cleanup Image Preview URL
   useEffect(() => {
     if (coverValue instanceof File) {
       const url = URL.createObjectURL(coverValue);
       setImagePreview(url);
       return () => URL.revokeObjectURL(url);
+    } else if (typeof coverValue === "string" && coverValue) {
+      setImagePreview(coverValue);
+    } else {
+      setImagePreview(null);
     }
   }, [coverValue]);
 
-  // 5. Handlers
+  // Auto handle Audio Name display
+  useEffect(() => {
+    if (audioValue instanceof File) {
+      setAudioPreview(audioValue.name);
+    } else if (typeof audioValue === "string" && audioValue) {
+      setAudioPreview("File âm thanh hiện tại");
+    } else {
+      setAudioPreview(null);
+    }
+  }, [audioValue]);
 
-  // Handle Audio File Change (Validate + Duration Calculation)
+  // --- HANDLERS ---
+
+  /**
+   * Xử lý khi chọn file Audio:
+   * 1. Validate size/type (đã có Zod lo, nhưng check nhanh ở đây UX tốt hơn)
+   * 2. Tính Duration
+   * 3. Auto-fill Title (nếu trống)
+   */
   const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate Size (50MB)
-      if (file.size > 50 * 1024 * 1024) {
-        toast.error("File quá lớn (>50MB). Vui lòng chọn file nhỏ hơn.");
-        return;
-      }
+    if (!file) return;
 
-      // Set value & name
-      setValue("audio", file, { shouldValidate: true, shouldDirty: true });
-      setAudioName(file.name);
-
-      // Calculate Duration
-      const audioObj = new Audio(URL.createObjectURL(file));
-      audioObj.onloadedmetadata = () => {
-        const calculatedDuration = Math.floor(audioObj.duration);
-        setValue("duration", calculatedDuration, { shouldValidate: true });
-        URL.revokeObjectURL(audioObj.src);
-      };
-
-      // Auto fill title if empty
-      const currentTitle = form.getValues("title");
-      if (!currentTitle) {
-        // Remove extension from filename
-        const titleFromFileName = file.name.replace(/\.[^/.]+$/, "");
-        setValue("title", titleFromFileName, { shouldValidate: true });
-      }
+    // UX: Auto fill title nếu chưa nhập
+    const currentTitle = form.getValues("title");
+    if (!currentTitle) {
+      const titleFromFileName = file.name.replace(/\.[^/.]+$/, ""); // Bỏ đuôi .mp3
+      setValue("title", titleFromFileName, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
     }
+
+    // Tính Duration
+    const audioObj = new Audio(URL.createObjectURL(file));
+    audioObj.onloadedmetadata = () => {
+      const calculatedDuration = Math.floor(audioObj.duration);
+      setValue("duration", calculatedDuration, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      URL.revokeObjectURL(audioObj.src); // Cleanup ngay
+    };
+
+    // Set file vào form
+    setValue("audio", file, { shouldValidate: true, shouldDirty: true });
   };
 
-  // Helper: Format Duration (seconds -> MM:SS)
-  const formatDuration = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec < 10 ? "0" + sec : sec}`;
+  /**
+   * Handle Submit thông minh:
+   * 1. Dirty Checking: Chỉ gửi field thay đổi
+   * 2. Build Payload: Dùng util đã tách
+   * 3. Gọi API
+   */
+  const handleSubmit = form.handleSubmit(async (values) => {
+    const isEditMode = !!trackToEdit;
+
+    // Check xem có thay đổi gì không (bao gồm cả file)
+    const hasAudioFile = values.audio instanceof File;
+    const hasImageFile = values.coverImage instanceof File;
+    const hasChanges = Object.keys(dirtyFields).length > 0;
+
+    // Nếu Edit mà không đổi gì -> Bỏ qua
+    if (isEditMode && !hasChanges && !hasAudioFile && !hasImageFile) {
+      toast.info("Không có thay đổi nào để cập nhật.");
+      return;
+    }
+
+    try {
+      const payload = buildTrackPayload(values, dirtyFields, isEditMode);
+      console.log("Built Payload:", values, dirtyFields, isEditMode); // Debug payload trước khi gửi
+      await onSubmit(payload);
+      // Reset form sau khi thành công được xử lý ở component cha hoặc onSuccess của mutation
+    } catch (error) {
+      console.error("Form submission error", error);
+    }
+  });
+
+  // Helper formatting (để UI dùng)
+  const formatDuration = (seconds: number) => {
+    if (!seconds) return "00:00";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? "0" + s : s}`;
   };
 
   return {
-    form, // react-hook-form object
-    imagePreview, // URL string for image preview
-    audioName, // Name of selected audio file
-    duration, // Current duration value
-    isPublic, // Current visibility status
+    form,
+    handleSubmit,
     handleAudioChange,
+
+    // States
+    imagePreview,
+    audioPreview,
+    isSubmitting,
+    isDirty: formState.isDirty,
+
+    // Helpers
     formatDuration,
   };
 };

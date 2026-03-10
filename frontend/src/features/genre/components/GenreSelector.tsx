@@ -1,211 +1,310 @@
 import React, { useState, useMemo } from "react";
-import { Search, Check, X, CornerDownRight, Loader2 } from "lucide-react";
+import {
+  Search,
+  Check,
+  X,
+  CornerDownRight,
+  Loader2,
+  FolderOpen,
+  Folder,
+  ListFilter,
+  Layers,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useGenres } from "@/features/genre/hooks/useGenreAdmin";
+import { useGenreTreeQuery } from "@/features/genre/hooks/useGenresQuery";
 import type { Genre } from "@/features/genre/types";
-import { Input } from "@/components/ui/input";
+
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
+// --- Helper Types ---
+type GenreNode = Genre & {
+  level: number;
+  isDisabled: boolean;
+  hasChildren: boolean;
+};
+
+// --- Helper Logic Build Tree ---
+const buildFlatTree = (
+  items: Genre[],
+  excludeIds: string[] = [],
+  parentId: string | null = null,
+  level = 0,
+): GenreNode[] => {
+  const result: GenreNode[] = [];
+  const children = items
+    .filter((item) => {
+      const itemParentId =
+        typeof item.parentId === "object" && item.parentId
+          ? (item.parentId as any)._id
+          : item.parentId;
+      return (itemParentId || null) === parentId;
+    })
+    .sort((a, b) => (a.priority > b.priority ? -1 : 1));
+
+  for (const child of children) {
+    if (excludeIds.includes(child._id)) continue;
+    const hasChildren = items.some((i) => {
+      const pId =
+        typeof i.parentId === "object" && i.parentId
+          ? (i.parentId as any)._id
+          : i.parentId;
+      return (pId || null) === child._id;
+    });
+
+    result.push({ ...child, level, isDisabled: false, hasChildren });
+    const grandChildren = buildFlatTree(
+      items,
+      excludeIds,
+      child._id,
+      level + 1,
+    );
+    result.push(...grandChildren);
+  }
+  return result;
+};
+
+// --- Props ---
 interface GenreSelectorProps {
   label?: string;
   required?: boolean;
   error?: string;
-  value: string[] | undefined;
-  onChange: (ids: string[]) => void;
+  // 🔥 FIX: Hỗ trợ cả mảng (Multi) và đơn (Single)
+  value: string | string[] | undefined | null;
+  // 🔥 FIX: Callback trả về đúng kiểu
+  onChange: (val: any) => void;
+
   singleSelect?: boolean;
   excludeIds?: string[];
   className?: string;
+  placeholder?: string;
+  // 🔥 FIX: Thêm variant để phân biệt UI Form/Filter
+  variant?: "form" | "filter";
 }
-
-type GenreDisplay = Genre & {
-  level: number;
-  isDisabled: boolean;
-  pathName: string;
-};
 
 export const GenreSelector: React.FC<GenreSelectorProps> = ({
   label,
   required,
   error,
-  value = [],
+  value,
   onChange,
   singleSelect = false,
   excludeIds = [],
   className,
+  placeholder = "Chọn thể loại...",
+  variant = "form",
 }) => {
-  const [filter, setFilter] = useState("");
-  const { data: genreRes, isLoading } = useGenres({
-    page: 1,
-    limit: 1000,
-    sort: "name",
-  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const { data: genres, isLoading } = useGenreTreeQuery();
 
-  const rawGenres = useMemo(() => genreRes?.data?.data || [], [genreRes]);
+  // Chuẩn hóa value đầu vào thành mảng để dễ kiểm tra
+  const selectedIds = useMemo(() => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") return [value];
+    return [];
+  }, [value]);
 
-  // Logic Tree Data
-  const treeData = useMemo(() => {
-    if (!rawGenres.length) return [];
-    const childrenMap = new Map<string, Genre[]>();
-    rawGenres.forEach((g) => {
-      const pId = g.parentId
-        ? typeof g.parentId === "object"
-          ? (g.parentId as any)._id
-          : g.parentId
-        : "root";
-      if (!childrenMap.has(pId)) childrenMap.set(pId, []);
-      childrenMap.get(pId)?.push(g);
-    });
-
-    const result: GenreDisplay[] = [];
-    const traverse = (
-      pId: string,
-      level: number,
-      parentDisabled: boolean,
-      pathPrefix: string
-    ) => {
-      const kids = childrenMap.get(pId);
-      if (!kids) return;
-      kids
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .forEach((kid) => {
-          const isSelfExcluded = excludeIds.includes(kid._id);
-          const shouldDisable = parentDisabled || isSelfExcluded;
-          const currentPath = pathPrefix
-            ? `${pathPrefix} > ${kid.name}`
-            : kid.name;
-          result.push({
-            ...kid,
-            level,
-            isDisabled: shouldDisable,
-            pathName: currentPath,
-          });
-          traverse(kid._id, level + 1, shouldDisable, currentPath);
-        });
-    };
-    traverse("root", 0, false, "");
-    return result;
-  }, [rawGenres, excludeIds]);
-
+  // Xử lý Tree Data
   const displayGenres = useMemo(() => {
-    if (!filter) return treeData;
-    return treeData
-      .filter((g) => g.name.toLowerCase().includes(filter.toLowerCase()))
-      .map((g) => ({ ...g, level: 0 }));
-  }, [treeData, filter]);
+    if (!genres) return [];
+    if (searchTerm) {
+      return genres
+        .filter((g) => g.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        .map((g) => ({
+          ...g,
+          level: 0,
+          isDisabled: false,
+          hasChildren: false,
+        }));
+    }
+    return buildFlatTree(genres, excludeIds);
+  }, [genres, searchTerm, excludeIds]);
 
-  const toggleGenre = (id: string) => {
-    const currentValues = Array.isArray(value) ? value : [];
-    const isAlreadySelected = currentValues.includes(id);
+  // 🔥 CORE LOGIC: Toggle Selection
+  const handleSelect = (id: string | null | undefined) => {
+    // Case 1: Single Select (Dùng cho Filter hoặc chọn Parent)
     if (singleSelect) {
-      onChange(isAlreadySelected ? [] : [id]);
+      // Nếu click lại cái đang chọn -> Bỏ chọn (undefined)
+      if (id === value) {
+        onChange(undefined);
+      } else {
+        onChange(id);
+      }
       return;
     }
+
+    // Case 2: Multi Select (Dùng cho gán Genre vào Track)
+    if (!id) return; // Multi không chọn root/null
+    const currentIds = selectedIds;
+    const isSelected = currentIds.includes(id);
+
     onChange(
-      isAlreadySelected
-        ? currentValues.filter((gId) => gId !== id)
-        : [...currentValues, id]
+      isSelected
+        ? currentIds.filter((item) => item !== id)
+        : [...currentIds, id],
     );
   };
 
   return (
-    <div className={cn("space-y-3 w-full", className)}>
-      {/* --- LABEL --- */}
+    <div className={cn("space-y-2 w-full", className)}>
       {label && (
         <Label className="text-xs font-bold uppercase text-foreground/80 tracking-wider flex items-center gap-1.5 ml-0.5">
-          {label}{" "}
-          {required && <span className="text-destructive text-sm">*</span>}
+          {label} {required && <span className="text-destructive">*</span>}
         </Label>
       )}
 
-      {/* Search Input Container */}
-      <div className="relative group">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-        <Input
-          placeholder="Lọc thể loại..."
-          // Thay đổi: Nền rõ hơn (bg-background), viền rõ hơn (border-input)
-          className={cn(
-            "pl-9 h-10 text-sm bg-background border-input shadow-sm rounded-lg focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
-            error && "border-destructive focus-visible:ring-destructive/20"
-          )}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-      </div>
-
-      {/* List container */}
-      {/* Thay đổi: Viền đậm hơn, bỏ nền xám mờ để tăng tương phản chữ */}
-      <div className="max-h-60 overflow-y-auto custom-scrollbar border border-border shadow-sm rounded-lg bg-background overflow-hidden">
-        {isLoading ? (
-          <div className="flex justify-center items-center py-12 text-sm text-muted-foreground gap-2">
-            <Loader2 className="size-4 animate-spin text-primary" /> Đang tải...
-          </div>
-        ) : displayGenres.length > 0 ? (
-          <div className="p-1.5 space-y-0.5">
-            {displayGenres.map((g) => {
-              const isSelected = Array.isArray(value) && value.includes(g._id);
-              return (
-                <div
-                  key={g._id}
-                  className={cn(
-                    "relative flex items-center gap-2 px-3 py-2.5 text-sm transition-all rounded-md select-none border border-transparent",
-                    g.isDisabled
-                      ? "opacity-40 cursor-not-allowed bg-muted/50"
-                      : "cursor-pointer hover:bg-accent hover:text-accent-foreground",
-                    // Thay đổi: Trạng thái Active đậm hơn, có border nhẹ
-                    isSelected &&
-                      !g.isDisabled &&
-                      "bg-primary/15 text-primary font-semibold border-primary/20 shadow-sm"
-                  )}
-                  style={{
-                    paddingLeft: !filter ? `${12 + g.level * 20}px` : "12px",
-                  }}
-                  onClick={() => !g.isDisabled && toggleGenre(g._id)}
-                >
-                  {/* Tree Lines Icon */}
-                  {!filter && g.level > 0 && (
-                    <CornerDownRight
-                      // Thay đổi: Màu icon đậm hơn để dễ nhìn cấu trúc
-                      className="size-3.5 text-muted-foreground/70 shrink-0"
-                    />
-                  )}
-
-                  <span className="flex-1 truncate leading-none">{g.name}</span>
-
-                  {isSelected && (
-                    <Check className="size-4 stroke-[3] text-primary" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="py-12 text-center text-xs font-bold text-muted-foreground/70 uppercase tracking-widest">
-            Không tìm thấy kết quả
-          </div>
+      <div
+        className={cn(
+          "border border-input rounded-sm bg-background shadow-sm transition-all focus-within:ring-2 focus-within:ring-primary/20",
+          error && "border-destructive focus-within:ring-destructive/20",
         )}
+      >
+        {/* Search */}
+        <div className="relative border-b border-border/50">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <input
+            type="text"
+            className="w-full h-10 pl-9 pr-4 text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground"
+            placeholder={placeholder}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        {/* List */}
+        <div className="max-h-[240px] overflow-y-auto custom-scrollbar p-1">
+          {isLoading ? (
+            <div className="py-8 text-center flex justify-center items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> Đang tải...
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {/* --- SPECIAL OPTIONS (Chỉ hiện khi không search) --- */}
+              {!searchTerm && (
+                <>
+                  {/* Option: ALL (Cho Filter) */}
+                  {variant === "filter" && (
+                    <div
+                      onClick={() => handleSelect(undefined)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-sm cursor-pointer text-sm transition-colors select-none",
+                        value === undefined
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "hover:bg-muted/50",
+                      )}
+                    >
+                      <ListFilter className="size-3.5 opacity-70" />
+                      <span className="flex-1">Tất cả cấp bậc</span>
+                      {value === undefined && <Check className="size-4" />}
+                    </div>
+                  )}
+
+                  {/* Option: ROOT ONLY (Cho Filter = "root", Cho Form = null) */}
+                  {(variant === "filter" || variant === "form") && (
+                    <div
+                      onClick={() =>
+                        handleSelect(variant === "filter" ? "root" : null)
+                      }
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-sm cursor-pointer text-sm transition-colors select-none",
+                        value === (variant === "filter" ? "root" : null)
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "hover:bg-muted/50",
+                      )}
+                    >
+                      {variant === "filter" ? (
+                        <FolderOpen className="size-3.5 text-purple-500" />
+                      ) : (
+                        <Layers className="size-3.5 text-primary" />
+                      )}
+                      <span className="flex-1">
+                        {variant === "filter"
+                          ? "Chỉ danh mục gốc"
+                          : "Gốc (Không có cha)"}
+                      </span>
+                      {value === (variant === "filter" ? "root" : null) && (
+                        <Check className="size-4" />
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* --- GENRE LIST --- */}
+              {displayGenres.map((genre) => {
+                const isSelected = selectedIds.includes(genre._id);
+                return (
+                  <div
+                    key={genre._id}
+                    onClick={() => handleSelect(genre._id)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-sm cursor-pointer text-sm transition-colors select-none group",
+                      isSelected
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "hover:bg-muted/50 text-foreground",
+                    )}
+                    style={{
+                      paddingLeft: searchTerm
+                        ? "12px"
+                        : `${12 + genre.level * 20}px`,
+                    }}
+                  >
+                    {!searchTerm && (
+                      <span className="text-muted-foreground/40 shrink-0">
+                        {genre.level === 0 ? (
+                          genre.hasChildren ? (
+                            <FolderOpen className="size-3.5" />
+                          ) : (
+                            <Folder className="size-3.5" />
+                          )
+                        ) : (
+                          <CornerDownRight className="size-3.5" />
+                        )}
+                      </span>
+                    )}
+                    <div className="flex-1 flex items-center gap-2 truncate">
+                      <div
+                        className="size-2 rounded-full shrink-0"
+                        style={{ backgroundColor: genre.color || "#ccc" }}
+                      />
+                      <span className="truncate">{genre.name}</span>
+                    </div>
+                    {isSelected && <Check className="size-4 shrink-0" />}
+                  </div>
+                );
+              })}
+
+              {displayGenres.length === 0 && !isLoading && (
+                <div className="py-8 text-center text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Không tìm thấy kết quả
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Tags for Multi-select */}
-      {!singleSelect && value.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-1">
-          {value.map((id) => {
-            const g = rawGenres.find((item) => item._id === id);
+      {/* Selected Tags (Chỉ cho Multi-select Form) */}
+      {!singleSelect && selectedIds.length > 0 && genres && (
+        <div className="flex flex-wrap gap-2 animate-in fade-in zoom-in-95 duration-200">
+          {selectedIds.map((id) => {
+            const g = genres.find((item) => item._id === id);
             if (!g) return null;
             return (
               <Badge
                 key={id}
                 variant="secondary"
-                // Thay đổi: Badge rõ ràng hơn với viền và nền tách biệt
-                className="h-7 pl-2.5 pr-1.5 bg-secondary text-secondary-foreground border border-border/50 text-[11px] font-bold uppercase rounded-md shadow-sm hover:bg-secondary/80 transition-colors"
+                className="pl-2.5 pr-1 py-0.5 h-7 text-xs border bg-background hover:bg-muted transition-colors flex items-center gap-1.5"
+                style={{ borderColor: g.color ? `${g.color}40` : undefined }}
               >
                 {g.name}
-                <div
-                  className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive cursor-pointer transition-colors"
-                  onClick={() => toggleGenre(id)}
+                <button
+                  type="button"
+                  onClick={() => handleSelect(id)}
+                  className="size-4 rounded-full hover:bg-destructive hover:text-white flex items-center justify-center transition-colors ml-1"
                 >
                   <X className="size-3" />
-                </div>
+                </button>
               </Badge>
             );
           })}
@@ -213,9 +312,9 @@ export const GenreSelector: React.FC<GenreSelectorProps> = ({
       )}
 
       {error && (
-        <div className="flex items-center gap-1.5 mt-1.5 text-destructive animate-in slide-in-from-left-1">
-          <span className="text-[11px] font-bold">{error}</span>
-        </div>
+        <p className="text-[11px] font-bold text-destructive animate-in slide-in-from-left-1">
+          {error}
+        </p>
       )}
     </div>
   );

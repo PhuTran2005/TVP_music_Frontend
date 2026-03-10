@@ -28,9 +28,7 @@ const AlbumManagementPage = () => {
     handlePageChange,
     clearFilters,
   } = useAlbumParams(APP_CONFIG.PAGINATION_LIMIT || 12);
-
   const { data, isLoading } = useAlbumsQuery(filterParams);
-
   const { createAlbumAsync, updateAlbumAsync, deleteAlbum, isMutating } =
     useAlbumMutations();
 
@@ -64,6 +62,7 @@ const AlbumManagementPage = () => {
 
   // 🔥 CORE LOGIC: Handle Form Submit (Data is FormData)
   const handleFormSubmit = async (formData: FormData) => {
+    console.log("Form data received in AlbumManagementPage:", formData);
     try {
       if (editingAlbum) {
         await updateAlbumAsync(editingAlbum._id, formData);
@@ -104,16 +103,19 @@ const AlbumManagementPage = () => {
       />
 
       {/* --- FILTER --- */}
-      <AlbumFilter
-        params={filterParams}
-        onSearch={handleSearch}
-        onFilterChange={handleFilterChange}
-        onReset={clearFilters}
-      />
+      <div className="bg-card rounded-2xl shadow-sm">
+        <AlbumFilter
+          params={filterParams}
+          onSearch={handleSearch}
+          onFilterChange={handleFilterChange}
+          onReset={clearFilters}
+        />
+      </div>
 
       {/* --- CONTENT GRID --- */}
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6">
+          {/* Render 10 cái skeleton với hiệu ứng wave */}
           <CardSkeleton count={10} />
         </div>
       ) : albums.length > 0 ? (
@@ -137,9 +139,8 @@ const AlbumManagementPage = () => {
         </div>
       )}
 
-      {/* --- PAGINATION --- */}
       {!isLoading && albums.length > 0 && (
-        <div className="pt-6 border-t border-border">
+        <div className="bg-card border rounded-2xl p-4 shadow-sm">
           <Pagination
             currentPage={meta.page}
             totalPages={meta.totalPages}
@@ -149,7 +150,6 @@ const AlbumManagementPage = () => {
           />
         </div>
       )}
-
       {/* --- MODALS --- */}
 
       {/* 1. Create/Edit Modal */}

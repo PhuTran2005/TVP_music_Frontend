@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Play,
@@ -13,16 +13,19 @@ import {
   Music2,
   SearchX,
   Dot,
+  Loader2,
 } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { toast } from "sonner";
 
 // Hooks & Store
-import { usePlaylistDetail } from "@/features/playlist/hooks/usePlaylist";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+// import { useAppDispatch } from "@/store/hooks";
+// import { setQueue, setIsPlaying } from "@/features/player/playerSlice";
 
 // UI Components
 import { Button } from "@/components/ui/button";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,61 +41,133 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
-// Modals
+// Modals & Sub-components
 import { EditPlaylistTracksModal } from "@/features/playlist/components/EditPlaylistTracksModal";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import { PlaylistDetailSkeleton } from "@/features/playlist/components/PlaylistDetailSkeleton";
 import PlaylistModal from "@/features/playlist/components/PlaylistModal";
 import { TrackList } from "@/features/track/components/TrackList";
-import { useAppSelector } from "@/store/hooks";
+import { usePlaylistDetail } from "@/features/playlist/hooks/usePlaylistsQuery";
+import { setIsPlaying, setQueue } from "@/features";
 
 dayjs.extend(relativeTime);
 
 const PlaylistDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  // const dispatch = useAppDispatch();
+  const [isScrolled, setIsScrolled] = useState(false);
 
+  // Modal & Interactive states
   const [isEditMetaOpen, setIsEditMetaOpen] = useState(false);
   const [isManageTracksOpen, setIsManageTracksOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isLoadingPlay, setIsLoadingPlay] = useState(false);
 
   // --- DATA ---
-  const { data, isLoading, isError } = usePlaylistDetail(slug!);
-  const playlist = data?.data;
+  const { data: playlist, isLoading, isError } = usePlaylistDetail(slug!);
   const { user } = useAppSelector((state) => state.auth);
 
+  // Trích xuất tracks an toàn
+  const tracks = useMemo(() => playlist?.tracks || [], [playlist]);
+  const dispatch = useAppDispatch();
+  // --- PERMISSIONS ---
   const isOwner = useMemo(() => {
     return playlist?.user?._id === user?._id || user?.role === "admin";
   }, [playlist, user]);
 
+  // --- THEME ---
   const themeColor = useMemo(
-    () => playlist?.themeColor || "#8b5cf6", // Violet-500 default
+    () => playlist?.themeColor || "#8b5cf6",
     [playlist],
   );
+
+  // --- UX: Scroll Listener cho Sticky Nav ---
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 300);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // --- LOGIC PLAY NHẠC ---
+  const handlePlayPlaylist = async () => {
+    if (tracks.length === 0) {
+      toast.error("Danh sách phát này hiện chưa có bài hát nào!");
+      return;
+    }
+
+    setIsLoadingPlay(true);
+    try {
+      // 1. Dispatch vào Queue của Redux
+      dispatch(setQueue({ tracks, startIndex: 0 }));
+      dispatch(setIsPlaying(true));
+
+      // 2. Giả lập delay mạng xíu để nhìn thấy hiệu ứng vòng xoay (Loading)
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      toast.success(`Đang phát ${tracks.length} bài hát.`);
+    } catch (err) {
+      toast.error("Không thể phát nhạc lúc này. Vui lòng thử lại.");
+    } finally {
+      setIsLoadingPlay(false);
+    }
+  };
+
+  // --- Fluid Typography ---
+  const titleClass = useMemo(() => {
+    if (!playlist?.title) return "";
+    const len = playlist.title.length;
+    if (len > 35) return "text-3xl sm:text-4xl md:text-5xl lg:text-6xl";
+    if (len > 15) return "text-4xl sm:text-5xl md:text-6xl lg:text-7xl";
+    return "text-5xl sm:text-6xl md:text-7xl lg:text-[6rem] xl:text-[7rem]";
+  }, [playlist?.title]);
+
+  const hexToRgba = (hex: string, opacity: number) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${opacity})`
+      : undefined;
+  };
 
   // --- LOADING / ERROR ---
   if (isLoading) return <PlaylistDetailSkeleton />;
   if (isError || !playlist)
-    return <PlaylistNotFound onBack={() => navigate("/")} />;
+    return <PlaylistNotFound onBack={() => navigate("/playlists")} />;
+
+  // Tính thời lượng
+  const totalMinutes = tracks.length
+    ? Math.floor(
+        tracks.reduce((acc: number, t: any) => acc + (t.duration || 0), 0) / 60,
+      )
+    : 0;
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground animate-in fade-in duration-700 overflow-x-hidden selection:bg-primary/30 selection:text-primary">
-      {/* --- LAYER 1: AMBIENT BACKDROP --- */}
+    <div className="relative min-h-screen bg-background text-foreground animate-in fade-in duration-1000 overflow-x-hidden selection:bg-primary/30 selection:text-primary">
+      {/* ================= LAYER 1: VIBRANT BACKDROP ================= */}
       <div
-        className="absolute inset-0 h-[60vh] pointer-events-none opacity-25 dark:opacity-20 transition-all duration-1000 ease-out"
+        className="absolute inset-0 h-[65vh] pointer-events-none transition-all duration-1000 ease-out opacity-100 dark:opacity-60 mix-blend-multiply dark:mix-blend-normal"
         style={{
-          background: `radial-gradient(circle at 50% -20%, ${themeColor}, transparent 70%)`,
+          background: `linear-gradient(180deg, ${hexToRgba(themeColor, 0.7)} 0%, ${hexToRgba(themeColor, 0.2)} 50%, hsl(var(--background)) 100%)`,
         }}
       />
-      <div className="absolute inset-0 h-[60vh] bg-gradient-to-b from-transparent via-background/80 to-background pointer-events-none" />
+      <div className="absolute inset-0 h-[65vh] bg-gradient-to-b from-transparent via-background/60 to-background pointer-events-none" />
 
-      <div className="relative z-10 container mx-auto px-4 md:px-8 pb-24">
-        {/* 1. HERO SECTION */}
-        <header className="flex flex-col md:flex-row items-center md:items-end gap-8 pt-24 pb-8 md:pt-32 md:pb-10">
-          {/* Cover Art - Vuông vắn, bóng đổ sâu */}
+      {/* ================= LAYER 2: CONTENT ================= */}
+      <div className="relative z-10 container mx-auto px-4 md:px-6 lg:px-8 pb-32">
+        {/* --- 1. HERO SECTION --- */}
+        <header className="flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-10 pt-24 pb-8 md:pt-32 md:pb-10">
+          {/* Playlist Cover Art */}
           <div className="group relative shrink-0">
-            <div className="relative size-52 sm:size-60 md:size-72 rounded-lg shadow-[0_20px_40px_rgba(0,0,0,0.4)] overflow-hidden bg-card border border-white/10 transition-transform duration-500 group-hover:scale-[1.01]">
+            <div
+              className="absolute inset-0 blur-2xl rounded-lg scale-110 opacity-40 transition-opacity duration-500 group-hover:opacity-60"
+              style={{ backgroundColor: themeColor }}
+            />
+            <div className="relative size-[220px] sm:size-[260px] md:size-[300px] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden bg-muted border border-border/10 transition-transform duration-500 group-hover:scale-[1.02]">
               {playlist.coverImage ? (
                 <img
                   src={playlist.coverImage}
@@ -101,9 +176,10 @@ const PlaylistDetailPage = () => {
                 />
               ) : (
                 <div className="size-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
-                  <ListMusic className="size-20 text-muted-foreground/20" />
+                  <ListMusic className="size-20 text-muted-foreground/30" />
                 </div>
               )}
+              <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent pointer-events-none mix-blend-overlay" />
 
               {/* Edit Overlay (Owner Only) */}
               {isOwner && (
@@ -113,7 +189,7 @@ const PlaylistDetailPage = () => {
                 >
                   <PenSquare className="size-8 text-white mb-2" />
                   <span className="text-white text-[10px] font-bold uppercase tracking-widest">
-                    Edit Cover
+                    Chỉnh sửa
                   </span>
                 </div>
               )}
@@ -121,168 +197,231 @@ const PlaylistDetailPage = () => {
           </div>
 
           {/* Playlist Info */}
-          <div className="flex flex-col items-center md:items-start text-center md:text-left gap-4 w-full min-w-0">
-            <div className="flex items-center gap-3">
-              <Badge
-                variant="outline"
-                className="text-[10px] font-bold uppercase tracking-widest h-6 px-2.5 bg-background/40 backdrop-blur-md border-white/10 shadow-sm"
-              >
-                {playlist.isSystem ? "Curated Playlist" : "Public Playlist"}
+          <div className="flex flex-col items-center md:items-start text-center md:text-left gap-3 w-full min-w-0">
+            <div className="flex items-center gap-2">
+              <Badge className="uppercase text-[10px] font-black tracking-[0.2em] px-3 py-1 bg-background/50 backdrop-blur-md text-foreground border-border/50 shadow-sm hidden md:inline-flex">
+                {playlist.isSystem ? "Playlist Hệ Thống" : "Playlist Cộng Đồng"}
               </Badge>
               {playlist.visibility === "private" && (
                 <Badge
-                  variant="secondary"
-                  className="text-[10px] font-bold h-6 gap-1 bg-black/40 text-white hover:bg-black/60 border-none"
+                  variant="destructive"
+                  className="uppercase text-[10px] font-black tracking-widest px-2.5 py-1 gap-1"
                 >
-                  <Lock className="size-2.5" /> Private
+                  <Lock className="size-3" /> Riêng tư
                 </Badge>
               )}
             </div>
 
             <h1
-              className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter text-foreground leading-[1.1] line-clamp-2 cursor-pointer hover:opacity-90 transition-opacity"
+              className={cn(
+                "font-black tracking-tighter leading-[1.05] drop-shadow-2xl text-foreground transition-opacity",
+                titleClass,
+                isOwner && "hover:opacity-80 cursor-pointer",
+              )}
               onClick={() => isOwner && setIsEditMetaOpen(true)}
-              title={isOwner ? "Click to edit title" : playlist.title}
+              title={isOwner ? "Nhấn để đổi tên" : playlist.title}
             >
               {playlist.title}
             </h1>
 
-            {/* Description */}
             {playlist.description && (
-              <p className="text-muted-foreground text-sm md:text-base font-medium line-clamp-2 max-w-2xl">
+              <p className="text-muted-foreground text-[14px] md:text-[15px] font-medium line-clamp-2 max-w-2xl mt-1">
                 {playlist.description}
               </p>
             )}
 
             {isOwner && !playlist.description && (
               <p
-                className="text-sm text-muted-foreground/50 italic cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+                className="text-sm text-muted-foreground/50 italic cursor-pointer hover:text-primary transition-colors flex items-center gap-1.5 mt-1"
                 onClick={() => setIsEditMetaOpen(true)}
               >
-                <PenSquare className="size-3" /> Add a description...
+                <PenSquare className="size-3.5" /> Thêm mô tả cho danh sách
+                phát...
               </p>
             )}
 
-            {/* Metadata & User */}
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-y-2 gap-x-1 mt-2 text-sm font-medium text-foreground/90">
+            {/* User & Metadata */}
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-y-2 gap-x-1 mt-2 text-[13px] font-bold text-foreground">
               <div
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer mr-2 pr-2 border-r border-border/40"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer mr-2 group/user"
                 onClick={() => navigate(`/profile/${playlist.user?._id}`)}
               >
-                <Avatar className="size-6 border border-white/10 shadow-sm">
+                <Avatar className="size-7 border-[1.5px] border-background shadow-sm">
                   <AvatarImage src={playlist.user?.avatar} />
-                  <AvatarFallback className="text-[9px] font-bold">
-                    {playlist.user?.fullName?.[0]}
+                  <AvatarFallback className="text-[10px] font-black bg-primary/20 text-primary">
+                    {playlist.user?.fullName?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <span className="font-bold hover:underline underline-offset-4 decoration-2">
-                  {playlist.user?.fullName}
+                <span className="font-black group-hover:underline underline-offset-4 decoration-2">
+                  {playlist.user?.fullName || "Hệ thống"}
                 </span>
               </div>
 
-              <span className="text-muted-foreground">
-                {playlist.totalTracks || 0} songs,
+              <span className="text-muted-foreground/60 hidden sm:inline">
+                •
               </span>
-              <span className="text-muted-foreground opacity-70">
-                updated {dayjs(playlist.updatedAt).fromNow()}
+              <span className="opacity-90">
+                {playlist.totalTracks || 0} bài hát
               </span>
+
+              {totalMinutes > 0 && (
+                <>
+                  <span className="text-muted-foreground/60 hidden sm:inline">
+                    ,
+                  </span>
+                  <span className="text-muted-foreground font-medium ml-1">
+                    {totalMinutes} phút
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </header>
 
-        {/* 2. STICKY ACTION BAR */}
-        <div className="sticky top-[64px] z-30 -mx-4 md:-mx-8 px-4 md:px-8 py-4 mb-6 flex items-center justify-between bg-background/80 backdrop-blur-xl border-b border-white/5 transition-all">
-          <div className="flex items-center gap-4">
-            {/* Primary Action */}
+        {/* --- 2. DYNAMIC STICKY ACTION BAR --- */}
+        <div className="sticky top-[64px] z-40 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mb-6 flex items-center justify-between bg-background/85 backdrop-blur-2xl border-b border-border/40 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-4 sm:gap-6">
+            {/* Primary Action: Play */}
             <Button
               size="icon"
-              className="size-14 rounded-full bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(var(--primary),0.3)] hover:scale-105 active:scale-95 transition-all duration-300"
+              onClick={handlePlayPlaylist}
+              disabled={isLoadingPlay}
+              className="size-14 sm:size-16 rounded-full bg-primary text-primary-foreground shadow-xl active:scale-90 transition-all hover:scale-105 group shrink-0"
+              style={{
+                backgroundColor: themeColor,
+                boxShadow: `0 10px 30px -10px ${hexToRgba(themeColor, 0.6)}`,
+              }}
             >
-              <Play className="size-6 fill-current ml-1" />
+              {isLoadingPlay ? (
+                <Loader2 className="size-7 sm:size-8 animate-spin" />
+              ) : (
+                <Play className="size-7 sm:size-8 fill-current ml-1.5 group-hover:scale-110 transition-transform" />
+              )}
+            </Button>
+
+            {/* Nút Tim (Save) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSaved(!isSaved)}
+              className="text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 rounded-full size-11 sm:size-12 active:scale-90 transition-all"
+            >
+              <Heart
+                className={cn(
+                  "size-7 sm:size-8 transition-all duration-300",
+                  isSaved && "fill-emerald-500 text-emerald-500 scale-110",
+                )}
+              />
             </Button>
 
             {/* Owner Tools */}
             {isOwner && (
-              <div className="flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
+              <div className="flex items-center gap-1 sm:gap-2 ml-1">
                 <TooltipAction
-                  label="Manage Tracks"
-                  icon={<ListMusic className="size-5" />}
+                  label="Thêm bài hát"
+                  icon={<ListMusic className="size-5 sm:size-6" />}
                   onClick={() => setIsManageTracksOpen(true)}
                 />
                 <TooltipAction
-                  label="Edit Details"
-                  icon={<PenSquare className="size-5" />}
+                  label="Sửa thông tin"
+                  icon={<PenSquare className="size-5 sm:size-6" />}
                   onClick={() => setIsEditMetaOpen(true)}
                 />
               </div>
             )}
 
-            {/* User Actions */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-red-500 hover:bg-transparent transition-transform hover:scale-110 ml-2"
-            >
-              <Heart className="size-7" />
-            </Button>
-
+            {/* Menu Khác */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-foreground hover:bg-transparent"
+                  className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full size-11 sm:size-12 transition-colors ml-1"
                 >
-                  <MoreHorizontal className="size-7" />
+                  <MoreHorizontal className="size-7 sm:size-8" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="w-56 rounded-xl p-1 border-white/10 bg-background/95 backdrop-blur-md shadow-xl"
+                className="w-56 rounded-2xl p-2 border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl"
               >
-                <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
-                  <PlusCircle className="size-4" /> Add to Queue
+                <DropdownMenuItem className="gap-3 py-3 font-semibold text-sm rounded-xl cursor-pointer">
+                  <PlusCircle className="size-4" /> Thêm vào danh sách khác
                 </DropdownMenuItem>
-                <DropdownMenuItem className="gap-3 py-2.5 font-medium rounded-lg cursor-pointer">
-                  <Share2 className="size-4" /> Share
+                <DropdownMenuItem className="gap-3 py-3 font-semibold text-sm rounded-xl cursor-pointer text-primary focus:text-primary focus:bg-primary/10">
+                  <Share2 className="size-4" /> Chia sẻ Playlist
                 </DropdownMenuItem>
+
                 {isOwner && (
                   <>
-                    <DropdownMenuSeparator className="bg-white/10 my-1" />
+                    <DropdownMenuSeparator className="bg-border/50 my-1" />
                     <DropdownMenuItem
-                      className="text-red-500 focus:text-red-500 focus:bg-red-500/10 gap-3 py-2.5 font-bold rounded-lg cursor-pointer"
+                      className="gap-3 py-3 font-bold text-sm rounded-xl cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
                       onClick={() => setIsDeleteOpen(true)}
                     >
-                      <Trash2 className="size-4" /> Delete Playlist
+                      <Trash2 className="size-4" /> Xóa Playlist
                     </DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* 🔥 Mini Nav Info (Fades in) */}
+          <div
+            className={cn(
+              "flex items-center gap-3 transition-all duration-500 transform pointer-events-none origin-right",
+              isScrolled
+                ? "opacity-100 scale-100 translate-x-0"
+                : "opacity-0 scale-95 translate-x-4",
+            )}
+          >
+            <span className="font-bold text-sm hidden md:block truncate max-w-[150px] lg:max-w-[250px]">
+              {playlist.title}
+            </span>
+            <div className="size-10 sm:size-11 rounded-md overflow-hidden shadow-sm border border-border/40 shrink-0 bg-muted flex items-center justify-center">
+              {playlist.coverImage ? (
+                <img
+                  src={playlist.coverImage}
+                  alt=""
+                  className="size-full object-cover"
+                />
+              ) : (
+                <ListMusic className="size-5 text-muted-foreground/50" />
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* 3. TRACKLIST */}
-        <div className="bg-background/40 rounded-xl backdrop-blur-sm -mx-2 sm:mx-0">
-          <TrackList tracks={playlist.tracks || []} isLoading={isLoading} />
+        {/* --- 3. TRACKLIST SECTION --- */}
+        <div className="bg-background/40 rounded-2xl backdrop-blur-sm -mx-2 sm:mx-0 min-h-[400px]">
+          {tracks.length > 0 ? (
+            <TrackList tracks={tracks} isLoading={isLoading} />
+          ) : (
+            <EmptyPlaylistState
+              isOwner={isOwner}
+              onAdd={() => setIsManageTracksOpen(true)}
+            />
+          )}
         </div>
 
-        {/* Footer */}
-        {playlist.tracks?.length > 0 && (
-          <footer className="mt-16 pt-8 border-t border-border/20 flex flex-col gap-2 items-center text-xs text-muted-foreground/60 font-medium">
+        {/* --- 4. FOOTER CREDITS --- */}
+        {tracks.length > 0 && (
+          <footer className="mt-20 pt-8 border-t border-border/30 flex flex-col gap-2 items-center text-xs text-muted-foreground/70 font-medium">
             <div className="flex items-center gap-2">
               <span>
-                Created {dayjs(playlist.createdAt).format("MMMM D, YYYY")}
+                Đã tạo ngày {dayjs(playlist.createdAt).format("DD/MM/YYYY")}
               </span>
-              <Dot className="size-3" />
-              <span>{playlist.tracks.length} songs</span>
+              <Dot className="size-4" />
+              <span className="text-foreground/90 font-bold">
+                {tracks.length} bài hát
+              </span>
             </div>
-            <p>© {new Date().getFullYear()} Music Platform</p>
           </footer>
         )}
       </div>
 
-      {/* --- MODALS --- */}
+      {/* ================= MODALS ================= */}
       <PlaylistModal
         isOpen={isEditMetaOpen}
         onClose={() => setIsEditMetaOpen(false)}
@@ -297,18 +436,19 @@ const PlaylistDetailPage = () => {
         isOpen={isDeleteOpen}
         onCancel={() => setIsDeleteOpen(false)}
         onConfirm={() => {
-          /* Logic delete */
+          // Xử lý logic Delete ở đây
+          setIsDeleteOpen(false);
         }}
-        title="Delete Playlist?"
-        description={`This will permanently delete "${playlist?.title}" from your library.`}
-        confirmLabel="Delete Forever"
+        title="Xóa danh sách phát?"
+        description={`Hành động này không thể hoàn tác. Danh sách phát "${playlist?.title}" sẽ bị xóa vĩnh viễn khỏi thư viện của bạn.`}
+        confirmLabel="Xóa vĩnh viễn"
         isDestructive
       />
     </div>
   );
 };
 
-// --- SUB-COMPONENTS (Clean & Styled) ---
+// ================= SUB-COMPONENTS =================
 
 const TooltipAction = ({
   label,
@@ -320,18 +460,18 @@ const TooltipAction = ({
   onClick: () => void;
 }) => (
   <TooltipProvider>
-    <Tooltip delayDuration={300}>
+    <Tooltip delayDuration={200}>
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-full size-10"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full size-11 sm:size-12 transition-colors"
           onClick={onClick}
         >
           {icon}
         </Button>
       </TooltipTrigger>
-      <TooltipContent className="font-bold text-[10px] uppercase tracking-widest bg-black text-white border-white/20 shadow-lg mb-2">
+      <TooltipContent className="font-bold text-[10px] uppercase tracking-widest bg-foreground text-background border-border shadow-xl mb-2 px-3 py-1.5 rounded-full">
         {label}
       </TooltipContent>
     </Tooltip>
@@ -345,59 +485,58 @@ const EmptyPlaylistState = ({
   isOwner: boolean;
   onAdd: () => void;
 }) => (
-  <div className="flex flex-col items-center justify-center h-full gap-6 animate-in slide-in-from-bottom-4 duration-700">
+  <div className="flex flex-col items-center justify-center h-full py-20 gap-6 animate-in slide-in-from-bottom-4 duration-700">
     <div className="relative group cursor-default">
-      <div className="absolute inset-0 bg-primary/20 blur-[60px] rounded-full group-hover:bg-primary/30 transition-all duration-1000" />
-      <div className="relative size-28 rounded-full bg-card border-2 border-dashed border-muted-foreground/20 flex items-center justify-center shadow-sm">
-        <Music2 className="size-12 text-muted-foreground/30" />
+      <div className="absolute inset-0 bg-primary/20 blur-[80px] rounded-full group-hover:bg-primary/30 transition-all duration-1000 scale-150" />
+      <div className="relative size-32 rounded-full bg-card border-2 border-dashed border-border flex items-center justify-center shadow-lg">
+        <Music2 className="size-12 text-muted-foreground/40" />
       </div>
     </div>
     <div className="space-y-2 text-center max-w-sm">
-      <h3 className="text-xl font-bold tracking-tight text-foreground">
-        It's a bit quiet here
+      <h3 className="text-2xl font-black tracking-tight text-foreground">
+        Ở đây hơi vắng lặng
       </h3>
-      <p className="text-muted-foreground leading-relaxed">
+      <p className="text-muted-foreground leading-relaxed font-medium">
         {isOwner
-          ? "Start building your dream collection. Add songs to get the vibe going."
-          : "This playlist is currently empty."}
+          ? "Hãy bắt đầu xây dựng bộ sưu tập mơ ước của bạn. Thêm các bài hát để tạo nên giai điệu riêng."
+          : "Danh sách phát này hiện tại chưa có bài hát nào."}
       </p>
     </div>
     {isOwner && (
       <Button
         onClick={onAdd}
         size="lg"
-        className="rounded-full px-8 font-bold uppercase text-xs tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+        className="rounded-full px-10 h-12 mt-2 font-bold uppercase text-[11px] tracking-widest shadow-xl hover:scale-105 transition-transform"
       >
-        Find Songs
+        Tìm bài hát
       </Button>
     )}
   </div>
 );
 
 const PlaylistNotFound = ({ onBack }: { onBack: () => void }) => (
-  <div className="flex flex-col items-center justify-center min-h-screen gap-8 text-center px-6 animate-in zoom-in-95 duration-500">
+  <div className="flex flex-col items-center justify-center min-h-screen gap-8 text-center px-6 bg-background animate-in zoom-in-95 duration-500">
     <div className="relative">
-      <div className="absolute inset-0 bg-red-500/10 blur-[80px] rounded-full scale-150" />
-      <div className="size-28 rounded-full bg-background border-4 border-muted flex items-center justify-center relative z-10 shadow-2xl">
+      <div className="absolute inset-0 bg-destructive/10 blur-[80px] rounded-full scale-150" />
+      <div className="size-32 rounded-full bg-background border-4 border-muted flex items-center justify-center relative z-10 shadow-2xl">
         <SearchX className="size-12 text-muted-foreground" />
       </div>
     </div>
     <div className="space-y-3">
       <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase">
-        Playlist Not Found
+        Không tìm thấy Playlist
       </h2>
-      <p className="text-muted-foreground text-lg max-w-md mx-auto leading-relaxed">
-        The playlist you are looking for might have been deleted, set to
-        private, or the link is incorrect.
+      <p className="text-muted-foreground text-base max-w-md mx-auto font-medium leading-relaxed">
+        Danh sách phát bạn tìm kiếm có thể đã bị xóa, đặt về chế độ riêng tư,
+        hoặc đường dẫn không hợp lệ.
       </p>
     </div>
     <Button
-      variant="outline"
+      variant="secondary"
       onClick={onBack}
-      size="lg"
-      className="rounded-full px-10 h-12 font-bold uppercase tracking-widest border-border hover:bg-foreground hover:text-background transition-all duration-300"
+      className="rounded-full px-10 h-12 font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform"
     >
-      Back to Home
+      Quay lại Thư viện
     </Button>
   </div>
 );

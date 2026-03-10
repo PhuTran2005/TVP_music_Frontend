@@ -104,7 +104,6 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
   const removeFilter = (key: keyof AlbumFilterParams) => {
     onFilterChange(key, undefined);
   };
-
   return (
     <div className="w-full mb-8">
       {/* CONTAINER CHÍNH:
@@ -156,7 +155,7 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
                 <SelectItem value="newest">Newest</SelectItem>
                 <SelectItem value="oldest">Oldest</SelectItem>
                 <SelectItem value="popular">Popular</SelectItem>
-                <SelectItem value="a-z">A-Z</SelectItem>
+                <SelectItem value="name">A-Z</SelectItem>
               </SelectContent>
             </Select>
 
@@ -174,7 +173,7 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
             >
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="size-3.5" />
-                <span className="font-medium">Filter</span>
+                <span className="font-medium hidden md:flex">Filter</span>
               </div>
 
               <div className="flex items-center gap-1">
@@ -201,9 +200,6 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
             isExpanded ? "grid-rows-[1fr] border-border" : "grid-rows-[0fr]",
           )}
         >
-          {/* 🔥 KEY FIX: overflow-hidden khi đang animate, overflow-visible khi đã mở xong.
-             Giúp dropdown YearPicker không bị che khuất.
-          */}
           <div
             className={cn(
               "bg-muted/30 transition-all",
@@ -284,9 +280,13 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
                 >
                   <div className="p-1">
                     <GenreSelector
-                      singleSelect
-                      value={params.genreId ? [params.genreId] : []}
-                      onChange={(ids) => onFilterChange("genreId", ids[0])}
+                      variant="filter"
+                      singleSelect={true}
+                      value={params.genreId}
+                      onChange={(val) => {
+                        onFilterChange("genreId", val);
+                      }}
+                      placeholder="Tìm kiếm thể loại..."
                     />
                   </div>
                 </FilterDropdown>
@@ -349,12 +349,14 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
                 label: "Type",
                 value: params.type,
                 icon: LayoutGrid,
+                color: "blue",
               },
               {
                 key: "year",
                 label: "Year",
                 value: params.year,
                 icon: Calendar,
+                color: "green",
               },
               {
                 key: "isPublic",
@@ -366,18 +368,21 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
                       : "Private"
                     : null,
                 icon: Eye,
+                color: "purple",
               },
               {
                 key: "genreId",
                 label: "Genre",
                 value: params.genreId ? "Selected" : null,
                 icon: Music,
+                color: "orange",
               },
               {
                 key: "artistId",
                 label: "Artist",
                 value: params.artistId ? "Selected" : null,
                 icon: Mic2,
+                color: "red",
               },
             ].map((filter) => {
               if (!filter.value) return null;
@@ -386,9 +391,9 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
                 <Badge
                   key={filter.key}
                   variant="secondary"
-                  className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border text-foreground hover:bg-accent transition-colors cursor-default font-normal shadow-sm"
+                  className={`h-7 pl-2 pr-1 gap-1.5 bg-background border border-border text-foreground hover:bg-accent transition-colors cursor-default font-normal shadow-sm ${filter.color === "blue" ? "text-blue-500" : filter.color === "green" ? "text-green-500" : filter.color === "purple" ? "text-purple-500" : filter.color === "orange" ? "text-orange-500" : filter.color === "red" ? "text-red-500" : ""}`}
                 >
-                  <Icon className="size-3 text-muted-foreground" />
+                  <Icon className={`size-3 text-${filter.color}-500`} />
                   <span className="text-muted-foreground">{filter.label}:</span>
                   <span className="font-medium text-foreground">
                     {filter.value}
@@ -410,7 +415,7 @@ const AlbumFilter: React.FC<AlbumFilterProps> = ({
               variant="ghost"
               size="sm"
               onClick={onReset}
-              className="h-7 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto font-medium"
+              className="h-7 px-2.5 text-xs text-destructive bg-primary/10 hover:bg-destructive/10 hover:text-destructive ml-auto font-medium"
             >
               <Trash2 className="size-3 mr-1.5" /> Clear All
             </Button>

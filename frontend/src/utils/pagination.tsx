@@ -60,7 +60,7 @@ const Pagination = ({
           totalPages - 3,
           totalPages - 2,
           totalPages - 1,
-          totalPages
+          totalPages,
         );
       } else {
         pages.push(
@@ -70,7 +70,7 @@ const Pagination = ({
           currentPage,
           currentPage + 1,
           "...",
-          totalPages
+          totalPages,
         );
       }
     }
@@ -79,10 +79,7 @@ const Pagination = ({
 
   return (
     <div
-      className={cn(
-        "flex flex-col gap-6 py-6 px-4 border-t border-border ",
-        className
-      )}
+      className={cn("flex flex-col gap-6 py-6 px-4 border-border ", className)}
     >
       <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
         {/* LEFT: Info & Items per Page */}
@@ -146,13 +143,13 @@ const Pagination = ({
                     "h-10 w-10 text-sm font-bold transition-all",
                     currentPage === page
                       ? "shadow-md shadow-primary/25 pointer-events-none bg-primary text-primary-foreground border-primary"
-                      : "border-input bg-background shadow-sm hover:border-primary/50 hover:text-primary"
+                      : "border-input bg-background shadow-sm hover:border-primary/50 hover:text-primary",
                   )}
                   onClick={() => onPageChange(page as number)}
                 >
                   {page}
                 </Button>
-              )
+              ),
             )}
           </div>
 

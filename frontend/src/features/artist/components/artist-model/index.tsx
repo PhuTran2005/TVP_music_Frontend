@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
+
+// Components (Giữ nguyên cấu trúc component con của bạn)
 import ModalHeader from "./ModalHeader";
 import ModalFooter from "./ModalFooter";
 import ImageSection from "./ImageSection";
@@ -7,11 +9,45 @@ import InfoSection from "./InfoSection";
 import SocialSection from "./SocialSection";
 import SettingsSection from "./SettingsSection";
 import GallerySection from "./GallerySection";
-import { useArtistModalLogic } from "@/features/artist/hooks/useArtistModalLogic";
 
-const ArtistModal: React.FC<any> = (props) => {
-  const { isOpen, onClose, artistToEdit } = props;
-  const { form, onSubmit, isPending } = useArtistModalLogic(props);
+// Logic Hook Mới
+import { useArtistForm } from "@/features/artist/hooks/useArtistForm";
+import type { Artist } from "@/features/artist/types";
+
+interface ArtistModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  artistToEdit?: Artist | null;
+  // Hook mới yêu cầu onSubmit nhận FormData
+  onSubmit: (data: FormData) => Promise<void>;
+  isPending: boolean;
+}
+
+const ArtistModal: React.FC<ArtistModalProps> = ({
+  isOpen,
+  onClose,
+  artistToEdit,
+  onSubmit,
+  isPending,
+}) => {
+  // 🔥 TÍCH HỢP HOOK MỚI
+  const {
+    form,
+    handleSubmit,
+    isSubmitting: isFormSubmitting, // Trạng thái xử lý nội bộ của form
+  } = useArtistForm({
+    artistToEdit,
+    onSubmit,
+  });
+
+  // Lock scroll body khi modal mở
+  useEffect(() => {
+    if (isOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "unset";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -35,7 +71,8 @@ const ArtistModal: React.FC<any> = (props) => {
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-muted/15">
           <form
             id="artist-form"
-            onSubmit={onSubmit}
+            // 🔥 UPDATE: Sử dụng handleSubmit từ hook mới (đã xử lý FormData)
+            onSubmit={handleSubmit}
             className="flex flex-col pb-8"
           >
             {/* 1. Phần ảnh bìa và Avatar */}
@@ -71,7 +108,11 @@ const ArtistModal: React.FC<any> = (props) => {
 
         {/* FOOTER Cố định */}
         <div className="border-t border-border bg-background z-20">
-          <ModalFooter onClose={onClose} isPending={isPending} />
+          <ModalFooter
+            onClose={onClose}
+            // Kết hợp trạng thái loading từ API và Hook Form
+            isPending={isPending || isFormSubmitting}
+          />
         </div>
       </div>
     </div>,

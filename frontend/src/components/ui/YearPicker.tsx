@@ -24,7 +24,7 @@ export const YearPicker: React.FC<YearPickerProps> = ({
 
   const years = Array.from(
     { length: maxYear - minYear + 1 },
-    (_, i) => maxYear - i
+    (_, i) => maxYear - i,
   );
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export const YearPicker: React.FC<YearPickerProps> = ({
   useLayoutEffect(() => {
     if (isOpen && value && scrollRef.current) {
       const selectedEl = scrollRef.current.querySelector(
-        `[data-year="${value}"]`
+        `[data-year="${value}"]`,
       );
       if (selectedEl) {
         selectedEl.scrollIntoView({ block: "center", behavior: "auto" });
@@ -59,7 +59,7 @@ export const YearPicker: React.FC<YearPickerProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "w-full justify-between font-normal h-9",
-          value && "bg-accent text-accent-foreground border-accent"
+          value && "bg-accent text-accent-foreground border-accent",
         )}
       >
         <div className="flex items-center gap-2 truncate">
@@ -83,7 +83,7 @@ export const YearPicker: React.FC<YearPickerProps> = ({
             <ChevronDown
               className={cn(
                 "size-4 opacity-50 transition-transform duration-200",
-                isOpen && "rotate-180"
+                isOpen && "rotate-180",
               )}
             />
           )}
@@ -111,7 +111,7 @@ export const YearPicker: React.FC<YearPickerProps> = ({
                   }}
                   className={cn(
                     "h-8 text-xs w-full",
-                    isSelected && "font-bold"
+                    isSelected && "font-bold",
                   )}
                 >
                   {year}

@@ -130,7 +130,7 @@ const MusicResult: React.FC<MusicResultProps> = ({
         isFullScreen
           ? "fixed inset-0 z-50 h-screen w-screen bg-background"
           : "w-full flex-1 bg-card/50 rounded-xl border border-border/50",
-        className
+        className,
       )}
     >
       {/* Background Effects (Tinh tế hơn, không quá chói) */}
@@ -139,7 +139,7 @@ const MusicResult: React.FC<MusicResultProps> = ({
         <div
           className={cn(
             "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full blur-[80px] opacity-20 mix-blend-screen",
-            glow
+            glow,
           )}
         />
         {/* Texture hạt nhiễu (tạo cảm giác đắt tiền) */}
@@ -167,7 +167,7 @@ const MusicResult: React.FC<MusicResultProps> = ({
             <div
               className={cn(
                 "p-6 rounded-full border shadow-lg backdrop-blur-md relative mb-2",
-                colorClass
+                colorClass,
               )}
             >
               {customIcon || (
@@ -177,7 +177,7 @@ const MusicResult: React.FC<MusicResultProps> = ({
               {/* Vòng xoay nhẹ (Loading vibes) */}
               <div
                 className={cn(
-                  "absolute inset-0 rounded-full border border-current opacity-20 animate-[spin_10s_linear_infinite]"
+                  "absolute inset-0 rounded-full border border-current opacity-20 animate-[spin_10s_linear_infinite]",
                 )}
               />
             </div>
@@ -246,7 +246,7 @@ const MusicResult: React.FC<MusicResultProps> = ({
       </div>
 
       {/* Footer Status (Tech style - Optional) */}
-      <div className="absolute bottom-6 flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/30 pointer-events-none select-none">
+      <div className="absolute bottom-1 flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/30 pointer-events-none select-none">
         <Music className="size-3 animate-pulse" />
         <span>System Status: {status}</span>
       </div>

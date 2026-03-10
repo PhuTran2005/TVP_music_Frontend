@@ -1,14 +1,17 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   MoreVertical,
   Edit,
   Trash2,
-  PlayCircle,
   Globe,
   User,
-  Music2,
   FolderKanban,
+  Play,
+  ListMusic,
 } from "lucide-react";
+
 import type { Playlist } from "@/features/playlist/types";
 
 // UI Components
@@ -18,10 +21,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EditPlaylistTracksModal } from "@/features/playlist/components/EditPlaylistTracksModal";
-import { useNavigate } from "react-router-dom";
+import { ImageWithFallback } from "@/components/figma/ImageWithFallback"; // Dùng chung component ảnh xịn
 
 interface PlaylistCardProps {
   playlist: Playlist;
@@ -37,118 +41,146 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
   const navigate = useNavigate();
   const [editTrackPlaylist, setEditTrackPlaylist] = useState(false);
 
+  const handleNavigate = () => {
+    navigate(`/playlists/${playlist.slug || playlist._id}`);
+  };
+
+  // Helper ngăn sự kiện click lan ra ngoài thẻ cha
+  const handleAction = (e: React.MouseEvent, action: () => void) => {
+    e.stopPropagation();
+    action();
+  };
+
   return (
     <>
-      <div className="group relative bg-card rounded-xl border border-border shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 flex flex-col overflow-hidden">
-        {/* Cover Image Area - Mobile: h-32, Desktop: Aspect Square */}
-        <div className="relative h-32 sm:h-auto sm:aspect-square bg-muted overflow-hidden">
-          {playlist.coverImage ? (
-            <img
-              src={playlist.coverImage}
-              alt={playlist.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-secondary/30">
-              <Music2 className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground/40" />
-            </div>
-          )}
+      <motion.div
+        whileHover={{ y: -4 }}
+        transition={{ type: "spring", stiffness: 260, damping: 22 }}
+        onClick={handleNavigate}
+        className="group cursor-pointer bg-card rounded-xl border border-border shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 flex flex-col overflow-hidden"
+      >
+        {/* ================= ARTWORK ================= */}
+        <div className="relative aspect-square overflow-hidden bg-muted">
+          <ImageWithFallback
+            src={playlist.coverImage}
+            alt={playlist.title}
+            className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
 
-          {/* Overlay Play - Desktop Only (hover) */}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
-            <button
-              onClick={() => navigate(`/playlists/${playlist.slug}`)}
-              className="transform scale-90 group-hover:scale-100 transition-transform duration-300 text-white hover:text-primary drop-shadow-lg"
-            >
-              <PlayCircle className="w-12 h-12 sm:w-14 sm:h-14 fill-current" />
-            </button>
-          </div>
+          {/* Gradient Overlay for Text/Badges */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 opacity-60 group-hover:opacity-80 transition-opacity" />
 
-          {/* Type Badge */}
-          <div className="absolute top-2 left-2 z-10">
+          {/* Top Badges */}
+          <div className="absolute top-2.5 left-2.5 right-2.5 flex justify-between items-start z-10">
             {playlist.isSystem ? (
-              <Badge
-                variant="default"
-                className="text-[10px] h-5 px-1.5 shadow-sm bg-primary text-primary-foreground border border-primary/20"
-              >
-                <Globe className="w-3 h-3 mr-1" /> System
+              <Badge className="text-[10px] uppercase tracking-widest bg-indigo-500/90 hover:bg-indigo-500 text-white backdrop-blur-md border-none flex items-center gap-1 shadow-md">
+                <Globe className="size-3" /> System
               </Badge>
             ) : (
-              <Badge
-                variant="secondary"
-                className="text-[10px] h-5 px-1.5 shadow-sm bg-background/90 backdrop-blur border border-border text-foreground"
-              >
-                <User className="w-3 h-3 mr-1" /> User
+              <Badge className="text-[10px] uppercase tracking-widest bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border-none flex items-center gap-1">
+                <User className="size-3" /> User
               </Badge>
             )}
           </div>
+
+          {/* Center Play Button Overlay */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Button
+              size="icon"
+              className="
+                size-12 sm:size-14 rounded-full
+                bg-primary text-primary-foreground
+                shadow-[0_24px_80px_rgba(0,0,0,0.6)]
+                opacity-0 scale-90
+                transition-all duration-300
+                group-hover:opacity-100 group-hover:scale-100
+              "
+            >
+              <Play className="size-5 sm:size-6 ml-0.5 fill-current" />
+            </Button>
+          </div>
         </div>
 
-        {/* Info Area */}
-        <div className="p-3 sm:p-4 flex flex-col gap-1 flex-1">
-          <div className="flex justify-between items-start gap-1">
+        {/* ================= INFO AREA ================= */}
+        <div className="p-4 flex flex-col gap-2 flex-1">
+          <div className="flex justify-between items-start gap-2">
             <div className="min-w-0 flex-1">
               <h3
-                className="font-bold text-sm sm:text-base leading-tight truncate text-foreground hover:text-primary transition-colors cursor-pointer"
+                className="font-bold text-[15px] leading-tight truncate text-foreground group-hover:text-primary transition-colors"
                 title={playlist.title}
-                onClick={() => navigate(`/playlists/${playlist.slug}`)}
               >
                 {playlist.title}
               </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground truncate mt-0.5 sm:mt-1">
-                {playlist.description || "No description provided"}
+              <p
+                className="text-sm text-muted-foreground truncate mt-0.5"
+                title={playlist.description}
+              >
+                {playlist.description || (
+                  <span className="italic opacity-60">No description</span>
+                )}
               </p>
             </div>
 
             {/* Action Menu */}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 sm:h-8 sm:w-8 -mr-2 text-muted-foreground hover:text-foreground"
+                  className="size-8 -mr-2 text-muted-foreground hover:text-foreground shrink-0"
                 >
-                  <MoreVertical className="w-4 h-4" />
+                  <MoreVertical className="size-4" />
                   <span className="sr-only">Open menu</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-48 rounded-xl">
                 <DropdownMenuItem
-                  onClick={() => setEditTrackPlaylist(true)}
-                  className="cursor-pointer"
+                  onClick={(e) =>
+                    handleAction(e, () => setEditTrackPlaylist(true))
+                  }
+                  className="font-medium cursor-pointer"
                 >
-                  <FolderKanban className="w-4 h-4 mr-2 text-primary" />
-                  Manage Tracks
+                  <FolderKanban className="mr-2 size-4 text-blue-500" /> Manage
+                  Tracks
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
-                  <Edit className="w-4 h-4 mr-2" /> Edit Details
-                </DropdownMenuItem>
+
                 <DropdownMenuItem
-                  onClick={onDelete}
-                  className="text-destructive focus:text-destructive cursor-pointer font-medium"
+                  onClick={(e) => handleAction(e, onEdit)}
+                  className="font-medium cursor-pointer"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Delete Playlist
+                  <Edit className="mr-2 size-4 text-primary" /> Edit Details
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  onClick={(e) => handleAction(e, onDelete)}
+                  className="font-medium text-destructive focus:text-destructive cursor-pointer focus:bg-destructive/10"
+                >
+                  <Trash2 className="mr-2 size-4" /> Delete Playlist
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          {/* Footer Info */}
-          <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/60 text-[10px] sm:text-xs text-muted-foreground font-medium">
-            <span className="truncate max-w-[60%]">
-              By{" "}
-              <span className="text-foreground">
+          {/* Metadata Footer */}
+          <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/50 text-[11px] font-semibold uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-muted-foreground truncate max-w-[60%]">
+              <User className="size-3.5 opacity-70" />
+              <span className="truncate">
                 {playlist.user?.fullName || "Unknown"}
               </span>
-            </span>
-            <span className="font-mono bg-muted/50 px-1.5 py-0.5 rounded text-foreground/80">
-              {playlist.totalTracks || 0} tracks
-            </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-foreground/80 bg-secondary/50 px-2 py-0.5 rounded-md">
+              <ListMusic className="size-3.5 opacity-70 text-primary" />
+              <span>{playlist.totalTracks || 0}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
+      {/* Modal Quản lý bài hát */}
       <EditPlaylistTracksModal
         isOpen={editTrackPlaylist}
         onClose={() => setEditTrackPlaylist(false)}

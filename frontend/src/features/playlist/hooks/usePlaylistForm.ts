@@ -1,92 +1,64 @@
-import { useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type Playlist } from "../types";
+import { Playlist } from "../types";
 import {
   playlistSchema,
   type PlaylistFormValues,
 } from "../schemas/playlist.schema";
+import { mapEntityToForm } from "../utils/formMapper";
+import { buildPlaylistPayload } from "../utils/payloadBuilder";
 
-export const usePlaylistForm = (
-  playlistToEdit: Playlist | null | undefined,
-  isOpen: boolean
-) => {
-  const [preview, setPreview] = useState<string | null>(null);
+interface UsePlaylistFormProps {
+  playlistToEdit?: Playlist | null;
+  onSubmit: (formData: FormData) => Promise<void>;
+}
 
+export const usePlaylistForm = ({
+  playlistToEdit,
+  onSubmit,
+}: UsePlaylistFormProps) => {
+  // 1. Memoize default values để tránh tính toán lại mỗi lần render
+  const defaultValues = useMemo(() => {
+    return mapEntityToForm(playlistToEdit);
+  }, [playlistToEdit]);
+
+  // 2. Init Form với Zod Resolver
   const form = useForm<PlaylistFormValues>({
     resolver: zodResolver(playlistSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      visibility: "public",
-      type: "playlist",
-      tags: [],
-      collaborators: [],
-      themeColor: "#1db954",
-      isSystem: false,
-      coverImage: null,
-    },
+    defaultValues,
+    mode: "onSubmit", // Validate khi submit để tối ưu performance
   });
 
-  const { reset, watch, setValue } = form;
-
-  // Sync dữ liệu khi mở Modal Edit
+  // 3. Reset form khi data đầu vào thay đổi (Ví dụ: mở modal edit khác)
   useEffect(() => {
-    if (!isOpen) return;
-    if (playlistToEdit) {
-      reset({
-        title: playlistToEdit.title,
-        description: playlistToEdit.description || "",
-        visibility: playlistToEdit.visibility || "public",
-        type: playlistToEdit.type || "playlist",
-        tags: playlistToEdit.tags || [],
-        themeColor: playlistToEdit.themeColor || "#1db954",
-        isSystem: playlistToEdit.isSystem || false,
-        coverImage: playlistToEdit.coverImage || null,
-        // 🔥 Chuyển Object User thành mảng ID
-        collaborators:
-          playlistToEdit.collaborators?.map((u: any) =>
-            typeof u === "string" ? u : u._id
-          ) || [],
-      });
-      setPreview(playlistToEdit.coverImage || null);
-    } else {
-      reset({
-        title: "",
-        description: "",
-        visibility: "public",
-        type: "playlist",
-        tags: [],
-        collaborators: [],
-        themeColor: "#1db954",
-        isSystem: false,
-        coverImage: null,
-      });
-      setPreview(null);
+    form.reset(defaultValues);
+  }, [defaultValues, form]);
+
+  // 4. Custom Submit Handler
+  const handleSubmit = form.handleSubmit(async (values) => {
+    const { dirtyFields } = form.formState;
+    const isEditMode = !!playlistToEdit;
+
+    // --- OPTIMIZATION: DIRTY CHECKING ---
+    // Nếu đang Edit mà không có field nào thay đổi (và không up ảnh mới) -> Bỏ qua
+    const hasFile = values.coverImage instanceof File;
+    const hasChanges = Object.keys(dirtyFields).length > 0;
+
+    if (isEditMode && !hasChanges && !hasFile) {
+      return;
     }
-  }, [isOpen, playlistToEdit, reset]);
 
-  // Handle Image Preview
-  const coverValue = watch("coverImage");
-  useEffect(() => {
-    if (coverValue instanceof File) {
-      const url = URL.createObjectURL(coverValue);
-      setPreview(url);
-      return () => URL.revokeObjectURL(url);
-    }
-  }, [coverValue]);
+    // Build Payload (FormData)
+    const payload = buildPlaylistPayload(values, dirtyFields, isEditMode);
 
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file)
-        setValue("coverImage", file, {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
-    },
-    [setValue]
-  );
+    await onSubmit(payload);
+  });
 
-  return { form, preview, values: watch(), handleFileChange };
+  return {
+    form,
+    handleSubmit,
+    isSubmitting: form.formState.isSubmitting,
+    isDirty: form.formState.isDirty,
+  };
 };

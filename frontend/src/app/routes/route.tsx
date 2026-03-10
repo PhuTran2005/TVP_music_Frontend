@@ -11,7 +11,6 @@ import {
   AnalyticPage,
   ArtistManagementPage,
   BrowsePage,
-  ClaimProfilePage,
   DashboardPage,
   GenreManagementPage,
   HomePage,
@@ -72,10 +71,10 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute />,
             children: [
               { path: CLIENT_PATHS.PROFILE, element: <ProfilePage /> },
-              {
-                path: CLIENT_PATHS.CLAIM_PROFILE,
-                element: <ClaimProfilePage />,
-              },
+              // {
+              //   path: CLIENT_PATHS.CLAIM_PROFILE,
+              //   element: <ClaimProfilePage />,
+              // },
               { path: CLIENT_PATHS.SETTINGS, element: <SettingsPage /> },
               ...protectedAuthRoutes,
             ],

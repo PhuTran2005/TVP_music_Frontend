@@ -7,66 +7,67 @@ import PageHeader from "@/components/ui/PageHeader";
 import Pagination from "@/utils/pagination";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import MusicResult from "@/components/ui/Result";
-// 🔥 FIX 1: Import thêm các thành phần Table để bọc Skeleton
 import {
   Table,
   TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
   TableRow,
+  TableHead,
 } from "@/components/ui/table";
 import TableSkeleton from "@/components/ui/TableSkeleton";
 
 // Feature Components
-import { useTrackAdmin } from "@/features/track/hooks/useTrackAdmin";
 import { TrackFilters } from "@/features/track/components/TrackFilters";
 import { TrackTable } from "@/features/track/components/TrackTable";
 import TrackModal from "@/features/track/components/TrackModal";
 import { BulkActionBar } from "@/features/track/components/BulkActionBar";
 import { BulkEditModal } from "@/features/track/components/BulkEditModal";
 
+// 🔥 NEW HOOKS
+import { useTrackParams } from "@/features/track/hooks/useTrackParams";
+import { useTrackMutations } from "@/features/track/hooks/useTrackMutations";
+
 // Types & Config
-import { type Track } from "@/features/track/types";
-import {
-  BulkTrackFormValues,
-  type TrackFormValues,
-} from "@/features/track/schemas/track.schema";
+import { BulkTrackFormValues } from "@/features/track/schemas/track.schema";
 import { APP_CONFIG } from "@/config/constants";
+import { ITrack } from "@/features/track/types";
+import { useAdminTracks } from "@/features/track/hooks/useTracksQuery";
 
 const TrackManagementPage = () => {
-  // --- 1. USE HOOK (Central Logic) ---
+  // --- 1. STATE MANAGEMENT (URL) ---
   const {
-    // Data
-    tracks,
-    meta,
     filterParams,
-
-    // States
-    isLoading,
-    isMutating,
-
-    // Actions
-    setFilterParams,
+    handleSearch,
+    handleFilterChange,
     handlePageChange,
+    clearFilters, // Added clear filters handler
+  } = useTrackParams(APP_CONFIG.PAGINATION_LIMIT);
 
-    // Mutation Wrappers
-    createTrack,
-    updateTrack,
+  // --- 2. DATA FETCHING (Read) ---
+  const { data, isLoading } = useAdminTracks(filterParams);
+
+  // --- 3. MUTATIONS (Write) ---
+  const {
+    createTrackAsync,
+    updateTrackAsync,
     deleteTrack,
     retryTranscode,
     bulkUpdateTrack,
-  } = useTrackAdmin(APP_CONFIG.PAGINATION_LIMIT);
+    isMutating,
+  } = useTrackMutations();
 
-  // --- 2. LOCAL UI STATE ---
+  // --- 4. LOCAL UI STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [trackToEdit, setTrackToEdit] = useState<Track | null>(null);
-  const [trackToDelete, setTrackToDelete] = useState<Track | null>(null);
+  const [trackToEdit, setTrackToEdit] = useState<ITrack | null>(null);
+  const [trackToDelete, setTrackToDelete] = useState<ITrack | null>(null);
 
+  // Bulk Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkMode, setBulkMode] = useState<"metadata" | "album" | null>(null);
 
-  // --- 3. HANDLERS ---
+  // --- HANDLERS ---
+
+  // Selection Logic
   const handleSelectOne = (id: string, checked: boolean) => {
     setSelectedIds((prev) =>
       checked ? [...prev, id] : prev.filter((item) => item !== id),
@@ -74,63 +75,77 @@ const TrackManagementPage = () => {
   };
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(tracks.map((t) => t._id));
+    if (checked && data?.tracks) {
+      setSelectedIds(data.tracks.map((t) => t._id));
     } else {
       setSelectedIds([]);
     }
   };
 
+  // Modal Handlers
   const handleOpenCreate = () => {
     setTrackToEdit(null);
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (track: Track) => {
+  const handleOpenEdit = (track: ITrack) => {
     setTrackToEdit(track);
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (data: TrackFormValues) => {
-    if (trackToEdit) {
-      updateTrack(trackToEdit._id, data, {
-        onSuccess: () => setIsModalOpen(false),
-      });
-    } else {
-      createTrack(data, {
-        onSuccess: () => setIsModalOpen(false),
-      });
+  // 🔥 CORE LOGIC: Submit Form (Receives FormData from Modal Hook)
+  const handleSubmitForm = async (formData: FormData) => {
+    try {
+      if (trackToEdit) {
+        await updateTrackAsync(trackToEdit._id, formData);
+      } else {
+        await createTrackAsync(formData);
+      }
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Failed to save track", error);
+      // Keep modal open on error for user to fix
     }
   };
 
-  const handleRetryTranscode = (track: Track) => {
+  const handleRetryTranscode = (track: ITrack) => {
     retryTranscode(track._id);
   };
 
   const handleBulkSubmit = (data: BulkTrackFormValues) => {
+    // Clean undefined values
     const cleanData = Object.fromEntries(
       Object.entries(data).filter(([_, v]) => v !== undefined),
     ) as BulkTrackFormValues;
 
     if (Object.keys(cleanData).length === 0) return;
 
-    bulkUpdateTrack(selectedIds, cleanData, {
-      onSuccess: () => {
-        setBulkMode(null);
-        setSelectedIds([]);
+    bulkUpdateTrack(
+      { ids: selectedIds, data: cleanData },
+      {
+        onSuccess: () => {
+          setBulkMode(null);
+          setSelectedIds([]);
+        },
       },
-    });
+    );
   };
 
-  const totalPages = meta.totalPages || 1;
-  const totalItems = meta.totalItems || 0;
-  const pageSize = meta.pageSize || APP_CONFIG.PAGINATION_LIMIT;
-
+  // Safe Access Data
+  const tracks = data?.tracks || [];
+  const meta = data?.meta || {
+    totalPages: 1,
+    totalItems: 0,
+    page: 1,
+    pageSize: APP_CONFIG.PAGINATION_LIMIT,
+  };
+  console.log("Rendering TrackManagementPage with tracks:", tracks);
   return (
     <div className="space-y-8 pb-32">
+      {/* HEADER */}
       <PageHeader
         title="Tracks Management"
-        subtitle={`Library contains ${totalItems} tracks.`}
+        subtitle={`Library contains ${meta.totalItems} tracks.`}
         action={
           <Button
             onClick={handleOpenCreate}
@@ -140,16 +155,21 @@ const TrackManagementPage = () => {
           </Button>
         }
       />
-
-      <TrackFilters params={filterParams} setParams={setFilterParams} />
+      <div className="bg-card rounded-2xl shadow-sm">
+        {/* FILTERS */}
+        <TrackFilters
+          params={filterParams}
+          onSearch={handleSearch}
+          onFilterChange={handleFilterChange}
+          onReset={clearFilters}
+        />
+      </div>
 
       {/* TABLE CONTENT */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
-          // 🔥 FIX 2: Bọc TableSkeleton trong cấu trúc Table chuẩn
           <Table>
             <TableHeader>
-              {/* Fake Header để Skeleton không bị lệch layout (tùy chọn) */}
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[50px]"></TableHead>
                 <TableHead className="w-[300px]">Track Info</TableHead>
@@ -161,7 +181,11 @@ const TrackManagementPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableSkeleton rows={pageSize} cols={7} />
+              <TableSkeleton
+                rows={meta.pageSize || APP_CONFIG.PAGINATION_LIMIT}
+                cols={7}
+                hasAvatar={true}
+              />
             </TableBody>
           </Table>
         ) : tracks.length === 0 ? (
@@ -179,7 +203,9 @@ const TrackManagementPage = () => {
             onEdit={handleOpenEdit}
             onDelete={setTrackToDelete}
             onRetry={handleRetryTranscode}
-            startIndex={(meta.page - 1) * pageSize}
+            startIndex={
+              (meta.page - 1) * (meta.pageSize ?? APP_CONFIG.PAGINATION_LIMIT)
+            }
             selectedIds={selectedIds}
             onSelectOne={handleSelectOne}
             onSelectAll={handleSelectAll}
@@ -188,36 +214,48 @@ const TrackManagementPage = () => {
       </div>
 
       {!isLoading && tracks.length > 0 && (
-        <div className="pt-2">
+        <div className="bg-card border rounded-2xl p-4 shadow-sm">
           <Pagination
             currentPage={meta.page}
-            totalPages={totalPages}
+            totalPages={meta.totalPages}
             onPageChange={handlePageChange}
-            totalItems={totalItems}
-            itemsPerPage={pageSize}
+            totalItems={meta.totalItems}
+            itemsPerPage={meta.pageSize || APP_CONFIG.PAGINATION_LIMIT}
           />
         </div>
       )}
+      {/* --- Action Bar & Modals --- */}
 
-      {/* --- Action Bar & Modals (Giữ nguyên) --- */}
+      {/* 1. Bulk Action Bar */}
       <BulkActionBar
         selectedCount={selectedIds.length}
         onClear={() => setSelectedIds([])}
         onEditAlbum={() => setBulkMode("album")}
         onEditMetadata={() => setBulkMode("metadata")}
         onDelete={() => {
-          alert("Bulk delete functionality coming soon!");
+          if (
+            confirm(
+              `Are you sure you want to delete ${selectedIds.length} tracks?`,
+            )
+          ) {
+            // Implement bulk delete if API supports it
+            alert("Bulk delete functionality coming soon!");
+          }
         }}
       />
 
-      <TrackModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        trackToEdit={trackToEdit}
-        onSubmit={handleSubmit}
-        isPending={isMutating}
-      />
+      {/* 2. Create/Edit Modal */}
+      {isModalOpen && (
+        <TrackModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          trackToEdit={trackToEdit}
+          onSubmit={handleSubmitForm} // 🔥 Now accepts FormData
+          isPending={isMutating}
+        />
+      )}
 
+      {/* 3. Bulk Edit Modal */}
       {bulkMode && (
         <BulkEditModal
           isOpen={!!bulkMode}
@@ -229,6 +267,7 @@ const TrackManagementPage = () => {
         />
       )}
 
+      {/* 4. Delete Confirmation */}
       <ConfirmationModal
         isOpen={!!trackToDelete}
         onCancel={() => setTrackToDelete(null)}
@@ -242,13 +281,20 @@ const TrackManagementPage = () => {
         isLoading={isMutating}
         description={
           <div>
-            Are you sure you want to permanently delete{" "}
-            <strong className="text-foreground">{trackToDelete?.title}</strong>?
-            <br />
-            <span className="text-destructive font-bold text-sm mt-2 block bg-destructive/10 p-2 rounded border border-destructive/20">
-              Warning: This action will permanently remove the audio file and
-              cannot be undone.
-            </span>
+            <p className="text-sm text-foreground/80 mb-2">
+              Are you sure you want to permanently delete{" "}
+              <strong className="text-foreground">
+                {trackToDelete?.title}
+              </strong>
+              ?
+            </p>
+            <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20 flex items-start gap-3">
+              <span className="text-lg">⚠️</span>
+              <span className="text-destructive font-bold text-xs mt-0.5">
+                Warning: This action will permanently remove the audio file and
+                metadata. This cannot be undone.
+              </span>
+            </div>
           </div>
         }
         confirmLabel="Yes, Delete"

@@ -1,51 +1,50 @@
 import api from "@/lib/axios";
 import type { ApiResponse, PagedResponse } from "@/types";
-import type {
-  CreateGenreInput,
-  UpdateGenreInput,
-  Genre,
-  GenreFilterParams,
-  GenreDetail,
-} from "../types";
-import { buildFormData } from "@/utils/form-data";
+import type { Genre, GenreDetail, GenreFilterParams } from "../types";
 
 const genreApi = {
+  // ==========================================
+  // PUBLIC (READ)
+  // ==========================================
   getAll: async (params: GenreFilterParams) => {
     const res = await api.get<ApiResponse<PagedResponse<Genre>>>("/genres", {
       params,
     });
     return res.data;
   },
+
   getBySlug: async (slug: string) => {
-    const res = await api.get<ApiResponse<GenreDetail>>("/genres/" + slug);
+    const res = await api.get<ApiResponse<GenreDetail>>(`/genres/${slug}`);
     return res.data;
   },
-  create: async (data: CreateGenreInput) => {
-    const formData = buildFormData(data);
-    console.log(data, ...formData);
-    const res = await api.post<ApiResponse<Genre>>("/genres", formData, {
+
+  // Lấy cây danh mục (Hierarchy) - Thường dùng cho menu hoặc selector
+  getTree: async () => {
+    const res = await api.get<ApiResponse<Genre[]>>("/genres/tree");
+    return res.data;
+  },
+
+  // ==========================================
+  // ADMIN (WRITE - Protected)
+  // ==========================================
+
+  // 🔥 FIX: Nhận FormData trực tiếp (đã build từ hook)
+  create: async (data: FormData) => {
+    const res = await api.post<ApiResponse<Genre>>("/genres", data, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return res.data;
   },
 
-  update: async (data: UpdateGenreInput) => {
-    const formData = buildFormData(data);
-    if (data.parentId === null) {
-      // Xóa dòng cũ nếu buildFormData đã lỡ add
-      formData.delete("parentId");
-      formData.append("parentId", ""); // Gửi chuỗi rỗng an toàn hơn "null"
-    }
-    const res = await api.patch<ApiResponse<Genre>>(
-      `/genres/${data._id}`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
+  // 🔥 FIX: Tách ID và FormData
+  update: async (id: string, data: FormData) => {
+    const res = await api.patch<ApiResponse<Genre>>(`/genres/${id}`, data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return res.data;
   },
 
+  // Toggle Trending/Active (Gửi JSON thường)
   toggleStatus: async (id: string) => {
     const res = await api.patch<ApiResponse<Genre>>(`/genres/${id}/toggle`);
     return res.data;

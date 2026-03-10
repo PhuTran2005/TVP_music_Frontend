@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
   X,
-  RotateCcw,
   Mic2,
   Disc,
   Tag,
   LayoutGrid,
-  ArrowUpDown,
-  Filter,
+  ListFilter,
+  SlidersHorizontal,
+  ChevronDown,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TrackFilterParams } from "@/features/track/types";
@@ -16,7 +17,11 @@ import type { TrackFilterParams } from "@/features/track/types";
 // Components
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import FilterDropdown from "@/components/ui/FilterDropdown";
+
+// Feature Selectors
 import { ArtistSelector } from "@/features/artist/components/ArtistSelector";
 import { AlbumSelector } from "@/features/album/components/AlbumSelector";
 import { GenreSelector } from "@/features/genre/components/GenreSelector";
@@ -29,270 +34,395 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface TrackFiltersProps {
   params: TrackFilterParams;
-  setParams: React.Dispatch<React.SetStateAction<TrackFilterParams>>;
+  onSearch: (keyword: string) => void;
+  onFilterChange: (key: keyof TrackFilterParams, value: any) => void;
+  onReset: () => void;
   className?: string;
   hideStatus?: boolean;
 }
 
+const SORT_OPTIONS = [
+  { label: "Mới nhất", value: "newest" },
+  { label: "Cũ nhất", value: "oldest" },
+  { label: "Phổ biến", value: "popular" },
+  { label: "Tên (A-Z)", value: "name" },
+] as const;
+
 const STATUS_OPTIONS = [
-  { value: "ready", label: "Ready", color: "bg-emerald-500" },
-  { value: "processing", label: "Processing", color: "bg-blue-500" },
-  { value: "pending", label: "Pending", color: "bg-yellow-500" },
-  { value: "failed", label: "Failed", color: "bg-red-500" },
+  { value: "ready", label: "Đã xử lý (Ready)", color: "bg-emerald-500" },
+  {
+    value: "processing",
+    label: "Đang xử lý (Processing)",
+    color: "bg-blue-500",
+  },
+  { value: "pending", label: "Chờ xử lý (Pending)", color: "bg-yellow-500" },
+  { value: "failed", label: "Lỗi (Failed)", color: "bg-red-500" },
 ] as const;
 
 export const TrackFilters: React.FC<TrackFiltersProps> = ({
   params,
-  setParams,
+  onSearch,
+  onFilterChange,
+  onReset,
   className,
   hideStatus = false,
 }) => {
-  const [showFilters, setShowFilters] = useState(false);
+  // --- 1. UI STATE ---
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [overflowVisible, setOverflowVisible] = useState(false);
 
-  // --- 1. Debounce Search Logic ---
+  // --- 2. SEARCH LOGIC ---
   const [localSearch, setLocalSearch] = useState(params.keyword || "");
+  const debouncedSearch = useDebounce(localSearch, 400);
 
+  // Đồng bộ URL -> Input
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (localSearch !== params.keyword) {
-        setParams((prev) => ({ ...prev, keyword: localSearch, page: 1 }));
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [localSearch, params.keyword, setParams]);
+    setLocalSearch(params.keyword || "");
+  }, [params.keyword]);
 
-  // Helper change params
-  const handleChange = useCallback(
-    (key: keyof TrackFilterParams, value: any) => {
-      setParams((prev) => ({ ...prev, [key]: value, page: 1 }));
-    },
-    [setParams],
-  );
+  // Đồng bộ Input -> URL (Thông qua Debounce)
+  useEffect(() => {
+    if (debouncedSearch !== (params.keyword || "")) {
+      onSearch(debouncedSearch);
+    }
+  }, [debouncedSearch, params.keyword, onSearch]);
 
-  // --- 2. Reset Logic ---
-  const handleReset = () => {
-    setLocalSearch("");
-    setParams((prev) => ({
-      ...prev,
-      page: 1,
-      limit: prev.limit,
-      keyword: "",
-      sort: "newest",
-      status: undefined,
-      artistId: undefined,
-      albumId: undefined,
-      genreId: undefined,
-    }));
+  // 🔥 FIX LỖI CLEAR SEARCH: Bỏ onSearch("") trực tiếp đi
+  const handleClearSearch = () => {
+    setLocalSearch(""); // Debounce sẽ tự động gọi onSearch("") sau 400ms, đảm bảo state không bị đụng độ
   };
 
-  // Check xem có đang filter không
-  const hasFilter = useMemo(() => {
-    return !!(
-      params.keyword ||
-      params.status ||
-      params.artistId ||
-      params.albumId ||
-      params.genreId ||
-      (params.sort && params.sort !== "newest")
-    );
+  // --- 3. ANIMATION LOGIC (Overflow Fix) ---
+  useEffect(() => {
+    if (isExpanded) {
+      const timer = setTimeout(() => setOverflowVisible(true), 300);
+      return () => clearTimeout(timer);
+    } else {
+      setOverflowVisible(false);
+    }
+  }, [isExpanded]);
+
+  // --- 4. ACTIVE COUNT ---
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (params.status) count++;
+    if (params.artistId) count++;
+    if (params.albumId) count++;
+    if (params.genreId) count++;
+    return count;
   }, [params]);
 
+  const removeFilter = (key: keyof TrackFilterParams) => {
+    onFilterChange(key, undefined);
+  };
+
   return (
-    <div
-      className={cn(
-        "w-full bg-card border border-border rounded-xl shadow-sm mb-8 transition-all hover:border-primary/20",
-        className,
-      )}
-    >
-      <div className="p-4 space-y-4">
-        {/* --- TOP ROW: Search & Actions --- */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+    <div className={cn("w-full mb-8", className)}>
+      <div className="bg-card border border-border rounded-xl shadow-sm transition-all">
+        {/* --- HEADER --- */}
+        <div className="p-4 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
           {/* Search Bar */}
-          <div className="relative w-full max-w-md group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <div className="relative w-full md:flex-1 md:max-w-xl group">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <Search className="size-4" />
+            </div>
             <Input
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Tìm bài hát, ISRC, lời nhạc..."
-              className="pl-9 bg-background h-10 text-sm border-input shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium placeholder:font-normal"
+              autoComplete="off"
+              spellCheck="false"
+              className="pl-9 pr-9 h-10 bg-background border-input shadow-sm focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-all"
             />
             {localSearch && (
               <button
-                onClick={() => setLocalSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-all"
+                type="button" // 🔥 FIX QUAN TRỌNG: Ngăn HTML tự hiểu đây là nút Submit form
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="size-3.5" />
               </button>
             )}
           </div>
 
-          {/* Right Actions Group */}
-          <div className="flex items-center gap-3 self-end md:self-auto w-full md:w-auto justify-end">
-            {/* Sort Dropdown */}
+          {/* Actions */}
+          <div className="flex items-center gap-3 w-full md:w-auto md:justify-end">
             <Select
               value={params.sort || "newest"}
-              onValueChange={(val) => handleChange("sort", val)}
+              onValueChange={(val) => onFilterChange("sort", val)}
             >
-              <SelectTrigger className="w-[160px] h-10 text-sm bg-background border-input shadow-sm font-medium">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-                  <SelectValue placeholder="Sắp xếp" />
+              <SelectTrigger className="h-10 w-full md:w-[160px] bg-background border-input shadow-sm hover:bg-accent/50 transition-colors">
+                <div className="flex items-center gap-2 truncate">
+                  <ListFilter className="size-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground text-xs uppercase tracking-wide font-semibold">
+                    Sắp xếp:
+                  </span>
+                  <SelectValue />
                 </div>
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Mới nhất</SelectItem>
-                <SelectItem value="popular">Phổ biến nhất</SelectItem>
-                <SelectItem value="monthlyListeners">
-                  Lượt nghe tháng
-                </SelectItem>
-                <SelectItem value="name">Tên A-Z</SelectItem>
+              <SelectContent align="end">
+                {SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            <div className="h-6 w-px bg-border hidden md:block" />
+            <Separator orientation="vertical" className="h-6 hidden md:block" />
 
             <Button
-              variant={showFilters ? "secondary" : "outline"}
-              onClick={() => setShowFilters(!showFilters)}
+              variant={isExpanded ? "secondary" : "outline"}
+              onClick={() => setIsExpanded(!isExpanded)}
               className={cn(
-                "gap-2 h-10 px-4 font-bold border-input shadow-sm transition-all",
-                showFilters &&
-                  "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20",
+                "h-10 px-4 gap-2 shadow-sm border-input hover:bg-accent/50 transition-all min-w-[100px] justify-between",
+                isExpanded &&
+                  "bg-primary/10 text-primary border-primary/30 hover:bg-primary/15",
               )}
             >
-              <Filter className="w-4 h-4" />
-              Bộ lọc
-            </Button>
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="size-3.5" />
+                <span className="font-medium">Filter</span>
+              </div>
 
-            {hasFilter && (
-              <Button
-                variant="ghost"
-                onClick={handleReset}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive h-10 px-3 gap-2 font-bold animate-in zoom-in duration-200"
-              >
-                <RotateCcw className="size-4" />
-                Xóa
-              </Button>
-            )}
+              <div className="flex items-center gap-1">
+                {activeFiltersCount > 0 && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    {activeFiltersCount}
+                  </span>
+                )}
+                <ChevronDown
+                  className={cn(
+                    "size-3.5 text-muted-foreground transition-transform duration-200",
+                    isExpanded && "rotate-180",
+                  )}
+                />
+              </div>
+            </Button>
           </div>
         </div>
 
-        {/* --- BOTTOM ROW: Expanded Filters --- */}
-        {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border animate-in slide-in-from-top-2 duration-300">
-            {/* 1. Status Select */}
-            {!hideStatus && (
-              <Select
-                value={params.status || "all"}
-                onValueChange={(val) =>
-                  handleChange("status", val === "all" ? undefined : val)
-                }
-              >
-                <SelectTrigger className="w-full h-10 bg-background border-input shadow-sm">
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <div className="p-1 bg-muted rounded">
-                      <LayoutGrid className="w-3.5 h-3.5 text-foreground/70" />
-                    </div>
-                    <span className="text-xs font-bold uppercase text-muted-foreground tracking-wide mr-1">
-                      Status:
+        {/* --- EXPANDABLE PANEL --- */}
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-300 ease-in-out border-t border-transparent",
+            isExpanded ? "grid-rows-[1fr] border-border" : "grid-rows-[0fr]",
+          )}
+        >
+          <div
+            className={cn(
+              "bg-muted/30 transition-all",
+              overflowVisible ? "overflow-visible" : "overflow-hidden",
+            )}
+          >
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Status Filter */}
+              {!hideStatus && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                    <LayoutGrid className="size-3" /> Trạng thái xử lý
+                  </label>
+                  <Select
+                    value={params.status || "all"}
+                    onValueChange={(val) =>
+                      onFilterChange("status", val === "all" ? undefined : val)
+                    }
+                  >
+                    <SelectTrigger className="w-full bg-background h-9 text-sm shadow-sm focus:ring-1">
+                      <SelectValue placeholder="Tất cả trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                      {STATUS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={cn("size-2 rounded-full", opt.color)}
+                            />
+                            {opt.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* 2. Artist Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                  <Mic2 className="size-3" /> Nghệ sĩ
+                </label>
+                <FilterDropdown
+                  isActive={!!params.artistId}
+                  onClear={() => onFilterChange("artistId", undefined)}
+                  label={
+                    <span className="truncate">
+                      {params.artistId ? "Đã chọn" : "Tìm nghệ sĩ"}
                     </span>
-                    <span className="text-foreground truncate font-semibold">
-                      {params.status
-                        ? params.status.charAt(0).toUpperCase() +
-                          params.status.slice(1)
-                        : "Tất cả"}
-                    </span>
+                  }
+                  contentClassName="w-[300px]"
+                  className="w-full bg-background h-9 text-sm font-normal px-3 justify-start shadow-sm focus:ring-1"
+                >
+                  <div className="p-1">
+                    <ArtistSelector
+                      singleSelect
+                      value={params.artistId ? [params.artistId] : []}
+                      onChange={(ids) => onFilterChange("artistId", ids[0])}
+                    />
                   </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                  {STATUS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <div className="flex items-center gap-2 font-medium">
-                        <div
-                          className={cn(
-                            "size-2.5 rounded-full ring-1 ring-white/20",
-                            opt.color,
-                          )}
-                        />
-                        {opt.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                </FilterDropdown>
+              </div>
+
+              {/* 3. Album Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                  <Disc className="size-3" /> Album
+                </label>
+                <FilterDropdown
+                  isActive={!!params.albumId}
+                  onClear={() => onFilterChange("albumId", undefined)}
+                  label={
+                    <span className="truncate">
+                      {params.albumId ? "Đã chọn" : "Tìm Album"}
+                    </span>
+                  }
+                  contentClassName="w-[300px]"
+                  className="w-full bg-background h-9 text-sm font-normal px-3 justify-start shadow-sm focus:ring-1"
+                >
+                  <div className="p-1">
+                    <AlbumSelector
+                      value={params.albumId || ""}
+                      onChange={(id) =>
+                        onFilterChange("albumId", id || undefined)
+                      }
+                    />
+                  </div>
+                </FilterDropdown>
+              </div>
+
+              {/* 4. Genre Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/80 tracking-widest flex items-center gap-1.5 ml-1">
+                  <Tag className="size-3" /> Thể loại
+                </label>
+                <FilterDropdown
+                  isActive={!!params.genreId}
+                  onClear={() => onFilterChange("genreId", undefined)}
+                  label={
+                    <span className="truncate">
+                      {params.genreId ? "Đã chọn" : "Tìm thể loại"}
+                    </span>
+                  }
+                  contentClassName="w-[300px]"
+                  className="w-full bg-background h-9 text-sm font-normal px-3 justify-start shadow-sm focus:ring-1"
+                >
+                  <div className="p-1">
+                    <GenreSelector
+                      variant="filter" // Chế độ Filter
+                      singleSelect={true}
+                      value={params.genreId} // String ID
+                      onChange={(val) => onFilterChange("genreId", val)}
+                      placeholder="Tìm kiếm thể loại..."
+                    />
+                  </div>
+                </FilterDropdown>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* --- ACTIVE TAGS FOOTER --- */}
+        {activeFiltersCount > 0 && (
+          <div className="p-3 bg-muted/20 border-t border-border flex flex-wrap items-center gap-2 rounded-b-xl">
+            <span className="text-xs font-semibold text-muted-foreground mr-1">
+              Đang lọc:
+            </span>
+
+            {/* Status Tag */}
+            {params.status && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                <LayoutGrid className="size-3 text-blue-500" />
+                <span className="text-muted-foreground">Trạng thái:</span>
+                <span className="font-medium capitalize">{params.status}</span>
+                <button
+                  onClick={() => removeFilter("status")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
             )}
 
-            {/* 2. Artist Filter Dropdown */}
-            <FilterDropdown
-              isActive={!!params.artistId}
-              onClear={() => handleChange("artistId", undefined)}
-              label={
-                <div className="flex items-center gap-2">
-                  <Mic2 className="w-4 h-4 text-indigo-500" />
-                  <span className="truncate text-sm font-medium">
-                    {params.artistId ? "Đã chọn nghệ sĩ" : "Chọn nghệ sĩ"}
-                  </span>
-                </div>
-              }
-              contentClassName="w-[300px]"
-            >
-              <div className="p-1">
-                <ArtistSelector
-                  singleSelect
-                  value={params.artistId ? [params.artistId] : []}
-                  onChange={(ids) => handleChange("artistId", ids[0])}
-                />
-              </div>
-            </FilterDropdown>
+            {/* Artist Tag */}
+            {params.artistId && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                <Mic2 className="size-3 text-indigo-500" />
+                <span className="text-muted-foreground">Nghệ sĩ:</span>
+                <span className="font-medium">Đã chọn</span>
+                <button
+                  onClick={() => removeFilter("artistId")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
 
-            {/* 3. Album Filter Dropdown */}
-            <FilterDropdown
-              isActive={!!params.albumId}
-              onClear={() => handleChange("albumId", undefined)}
-              label={
-                <div className="flex items-center gap-2">
-                  <Disc className="w-4 h-4 text-orange-500" />
-                  <span className="truncate text-sm font-medium">
-                    {params.albumId ? "Đã chọn album" : "Chọn album"}
-                  </span>
-                </div>
-              }
-              contentClassName="w-[300px]"
-            >
-              <div className="p-1">
-                <AlbumSelector
-                  value={params.albumId || ""}
-                  onChange={(id) => handleChange("albumId", id || undefined)}
-                />
-              </div>
-            </FilterDropdown>
+            {/* Album Tag */}
+            {params.albumId && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                <Disc className="size-3 text-orange-500" />
+                <span className="text-muted-foreground">Album:</span>
+                <span className="font-medium">Đã chọn</span>
+                <button
+                  onClick={() => removeFilter("albumId")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
 
-            {/* 4. Genre Filter Dropdown */}
-            <FilterDropdown
-              isActive={!!params.genreId}
-              onClear={() => handleChange("genreId", undefined)}
-              label={
-                <div className="flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-emerald-500" />
-                  <span className="truncate text-sm font-medium">
-                    {params.genreId ? "Đã chọn thể loại" : "Chọn thể loại"}
-                  </span>
-                </div>
-              }
-              contentClassName="w-[320px]"
+            {/* Genre Tag */}
+            {params.genreId && (
+              <Badge
+                variant="secondary"
+                className="h-7 pl-2 pr-1 gap-1.5 bg-background border border-border hover:bg-accent cursor-default"
+              >
+                <Tag className="size-3 text-emerald-500" />
+                <span className="text-muted-foreground">Thể loại:</span>
+                <span className="font-medium">Đã chọn</span>
+                <button
+                  onClick={() => removeFilter("genreId")}
+                  className="ml-1 p-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onReset}
+              className="h-7 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto font-medium"
             >
-              <div className="p-1">
-                <GenreSelector
-                  singleSelect
-                  value={params.genreId ? [params.genreId] : []}
-                  onChange={(ids) => handleChange("genreId", ids[0])}
-                />
-              </div>
-            </FilterDropdown>
+              <Trash2 className="size-3 mr-1.5" /> Xóa bộ lọc
+            </Button>
           </div>
         )}
       </div>

@@ -5,6 +5,7 @@ import { useRealtimeChart } from "@/features/track/hooks/useRealtimeChart";
 import { ChartItem } from "@/features/track/components/ChartItem";
 import { cn } from "@/lib/utils";
 import { SectionHeader } from "@/pages/client/home/SectionHeader";
+import { ChartTrack } from "@/features/track/types";
 
 export const TopFeaturedTracks = () => {
   const { tracks, prevRankMap, isLoading, isUpdating } = useRealtimeChart();
@@ -17,7 +18,6 @@ export const TopFeaturedTracks = () => {
       </div>
     );
   }
-
   return (
     // 🔥 Thêm border-b để tách biệt section
     <section className="py-16 lg:py-24 bg-background border-b border-border/40 relative">
@@ -37,11 +37,11 @@ export const TopFeaturedTracks = () => {
         <div
           className={cn(
             "flex flex-col gap-2 transition-opacity duration-500", // Tăng gap lên 2 cho thoáng
-            isUpdating && "opacity-70 pointer-events-none"
+            isUpdating && "opacity-70 pointer-events-none",
           )}
         >
           <AnimatePresence mode="popLayout" initial={false}>
-            {top10.map((track, index) => {
+            {top10.map((track: ChartTrack, index: number) => {
               const rank = index + 1;
               const prevRank = prevRankMap[track._id] ?? rank;
 

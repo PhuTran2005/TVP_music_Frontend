@@ -19,17 +19,16 @@ const albumApi = {
   },
 
   create: async (data: FormData) => {
-    const response = await api.post("/albums", data, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    return response.data;
+    // const response = await api.post("/albums", data, {
+    //   headers: {
+    //     "Content-Type": "multipart/form-data",
+    //   },
+    // });
+    // return response.data;
   },
 
   update: async (id: string, data: FormData | Partial<Album>) => {
     const isFormData = data instanceof FormData;
-
     const response = await api.patch(`/albums/${id}`, data, {
       headers: {
         "Content-Type": isFormData ? "multipart/form-data" : "application/json",
